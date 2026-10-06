@@ -2,6 +2,10 @@ import { createServer } from 'node:http';
 import { readFile } from 'node:fs/promises';
 import { resolve } from 'node:path';
 import { readFileSync, existsSync } from 'node:fs';
+import { writeFile, unlink } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
+import { spawn } from 'node:child_process';
+import ffmpegPath from 'ffmpeg-static';
 
 if (existsSync(resolve('.env'))) {
   for (const line of readFileSync(resolve('.env'),'utf8').split(/\r?\n/)) {
