@@ -218,12 +218,63 @@ window.previewTrack=async i=>{const x=musicResults[i];if(!x?.audio)return;try{if
 window.selectTrack=i=>{const x=musicResults[i];if(!x)return;selectedMusic=x;if(musicPreview){musicPreview.pause();musicPreview=null}$('musicStart').value=0;$('musicEnd').value=Math.min(+$('duration').value,+x.duration||15);$('musicInfo').textContent='Selected: '+x.name+' · '+x.artist_name+' · '+x.duration+'s';renderMusic()};
 $('musicSearchBtn').onclick=async()=>{const q=$('musicQuery').value.trim();if(!q)return;$('musicCatalogStatus').textContent='Searching licensed music…';try{const j=await json('/music-search?q='+encodeURIComponent(q));if(!j||j.error){$('musicCatalogStatus').textContent=j?.error||'Music search failed';musicResults=[];renderMusic();return}musicResults=(j.results||[]).filter(x=>x.audio).map(x=>({id:x.id,name:x.name,artist_name:x.artist_name,duration:+x.duration||0,audio:x.audio,license_ccurl:x.license_ccurl,audiodownload_allowed:x.audiodownload_allowed}));$('musicCatalogStatus').textContent='Found '+musicResults.length+' licensed catalog tracks. Verify the track license/usage terms for your publishing use.';renderMusic()}catch(e){$('musicCatalogStatus').textContent='Music search failed: '+e.message}};
 $('importMusicBtn').onclick=()=>$('musicFile').click();
-$('musicFile').onchange=async e=>{const f=e.target.files?.[0];if(!f)return;try{if(musicPreview){musicPreview.pause();musicPreview=null}if(audioObj){audioObj.pause();audioObj.src='';audioObj=null}audioURL=URL.createObjectURL(f);audioObj=new Audio(audioURL);audioObj.preload='metadata';audioObj.onloadedmetadata=()=>{$('musicStart').value=0;$('musicEnd').value=Math.min(+$('duration').value||15,Number.isFinite(audioObj.duration)?audioObj.duration:15);$('musicInfo').textContent='Imported: '+f.name+' · '+Math.round((audioObj.duration||0))+'s · Ready for reel';};audioObj.onerror=()=>{$('musicInfo').textContent='This music file could not be decoded by the browser.'};}catch(err){$('musicInfo').textContent='Import failed: '+err.message}};
+$('musicFile').onchange=async e=>{const f=e.target.files?.[0];if(!f)return;try{if(musicPreview){musicPreview.pause();musicPreview=null}if(audioObj){audioObj.pause();audioObj.src='';audioObj=null}audioURL=URL.createObjectURL(f);audioObj=new Audio(audioURL);selectedMusic={id:'local-'+Date.now(),name:f.name,artist_name:'Imported from device',duration:0,audio:audioURL,local:true};audioObj.preload='metadata';audioObj.onloadedmetadata=()=>{$('musicStart').value=0;$('musicEnd').value=Math.min(+$('duration').value||15,Number.isFinite(audioObj.duration)?audioObj.duration:15);$('musicInfo').textContent='Imported: '+f.name+' · '+Math.round((audioObj.duration||0))+'s · Ready for reel';};audioObj.onerror=()=>{$('musicInfo').textContent='This music file could not be decoded by the browser.'};}catch(err){$('musicInfo').textContent='Import failed: '+err.message}};
 $('previewMusic').onclick=async()=>{if(!audioObj)return alert('Choose a music track or import a song first');audioObj.currentTime=+$('musicStart').value;await audioObj.play();audioObj.ontimeupdate=()=>{if(audioObj.currentTime>=+$('musicEnd').value){audioObj.pause();audioObj.ontimeupdate=null}}};
 $('stopMusic').onclick=()=>audioObj?.pause();musicPreview?.pause();
-$('export').onclick=async()=>{if(!selected.length)autoSelect();const c=$('canvas'),stream=c.captureStream(30);const musicAudio=selectedMusic?.audio||null;if(musicAudio){try{if(!audioCtx){audioCtx=new AudioContext();audioObj=new Audio(musicAudio);audioObj.crossOrigin='anonymous';audioObj.preload='auto';audioSource=audioCtx.createMediaElementSource(audioObj);audioDest=audioCtx.createMediaStreamDestination();audioSource.connect(audioDest);audioSource.connect(audioCtx.destination)}if(audioCtx.state==='suspended')await audioCtx.resume();stream.addTrack(audioDest.stream.getAudioTracks()[0]);}catch(e){console.warn('Audio mux unavailable',e)}}const mime=MediaRecorder.isTypeSupported('video/webm;codecs=vp9,opus')?'video/webm;codecs=vp9,opus':(MediaRecorder.isTypeSupported('video/webm;codecs=vp9')?'video/webm;codecs=vp9':'video/webm'),rec=new MediaRecorder(stream,{mimeType:mime,videoBitsPerSecond:8000000}),chunks=[];rec.ondataavailable=e=>e.data.size&&chunks.push(e.data);rec.onstop=()=>{const blob=new Blob(chunks,{type:mime}),a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download='festival-of-bharat-'+activeTemplate.name.toLowerCase().replace(/ /g,'-')+'.webm';a.click();$('qc').textContent='QC: Browser export created as WebM. Selected music is routed into the recording when the browser supports MediaRecorder audio tracks; final MP4/H.264 conversion is not yet implemented.'};rec.start(200);if(audioObj){audioObj.currentTime=+$('musicStart').value;audioObj.play().catch(()=>{});audioObj.ontimeupdate=()=>{if(audioObj.currentTime>=+$('musicEnd').value){audioObj.pause();audioObj.ontimeupdate=null}}}$('qc').textContent='QC: Recording '+(audioObj?'with audio':'without audio');const st=performance.now(),d=+$('duration').value*1000;playing=true;const f=n=>{draw((n-st)/1000);if(n-st<d)requestAnimationFrame(f);else{playing=false;rec.stop()}};requestAnimationFrame(f)};
-update();draw(0);
-</script></body></html><script>
+$('export').onclick=async()=>{
+ if(!selected.length)autoSelect();
+ if(!selected.length){$('qc').textContent='QC: Add or import media first';return}
+ if(!sequence.length)sequence=buildSequence();
+ openWorkspace('preview');
+ await new Promise(requestAnimationFrame);
+ const c=$('canvas'),stream=c.captureStream(30);
+ let exportAudio=null;
+ try{
+   const musicSrc=selectedMusic?.audio||null;
+   if(musicSrc){
+     if(audioObj){try{audioObj.pause()}catch{}}
+     audioObj=new Audio(musicSrc);audioObj.crossOrigin=selectedMusic?.local?'anonymous':'anonymous';audioObj.preload='auto';
+     if(!audioCtx)audioCtx=new AudioContext();
+     if(audioCtx.state==='suspended')await audioCtx.resume();
+     audioSource=audioCtx.createMediaElementSource(audioObj);
+     audioDest=audioCtx.createMediaStreamDestination();
+     audioSource.connect(audioDest);audioSource.connect(audioCtx.destination);
+     const track=audioDest.stream.getAudioTracks()[0];if(track)stream.addTrack(track);
+     exportAudio=audioObj;
+   }
+ }catch(e){console.warn('Audio export unavailable',e);$('qc').textContent='QC: Video recording; audio could not be attached in this browser'}
+ const mime=MediaRecorder.isTypeSupported('video/webm;codecs=vp9,opus')?'video/webm;codecs=vp9,opus':(MediaRecorder.isTypeSupported('video/webm;codecs=vp9')?'video/webm;codecs=vp9':'video/webm');
+ let rec;try{rec=new MediaRecorder(stream,{mimeType:mime,videoBitsPerSecond:8000000})}catch(e){$('qc').textContent='QC: Browser cannot record this reel';return}
+ const chunks=[];
+ rec.ondataavailable=e=>{if(e.data.size)chunks.push(e.data)};
+ rec.onstop=()=>{
+   const blob=new Blob(chunks,{type:mime}),a=document.createElement('a');
+   a.href=URL.createObjectURL(blob);a.download='festival-of-bharat-'+activeTemplate.name.toLowerCase().replace(/[^a-z0-9]+/g,'-')+'.webm';a.click();
+   setTimeout(()=>URL.revokeObjectURL(a.href),30000);
+   $('qc').textContent='QC: Reel created successfully · WebM · '+($('duration').value)+'s'+(exportAudio?' · music attached':'');
+ };
+ if(exportAudio){
+   exportAudio.currentTime=Math.max(0,+$('musicStart').value||0);
+   exportAudio.ontimeupdate=()=>{const end=+$('musicEnd').value||0;if(end>0&&exportAudio.currentTime>=end){exportAudio.pause();exportAudio.ontimeupdate=null}};
+   try{await exportAudio.play()}catch{}
+ }
+ rec.start(200);
+ $('qc').textContent='QC: Creating reel… 0%';
+ const duration=Math.max(1,+$('duration').value||15),startedAt=performance.now();
+ playing=true;
+ while(playing){
+   const elapsed=(performance.now()-startedAt)/1000;
+   if(elapsed>=duration)break;
+   await draw(elapsed);
+   $('qc').textContent='QC: Creating reel… '+Math.min(99,Math.round(elapsed/duration*100))+'%';
+   await new Promise(requestAnimationFrame);
+ }
+ playing=false;cancelAnimationFrame(raf);
+ await draw(duration-.001);
+ if(exportAudio){try{exportAudio.pause()}catch{}}
+ rec.stop();
+};update();draw(0);
+</script><script>
 $('captionText').oninput=()=>draw(0);$('fontFamily').onchange=()=>{$('fontPreview').style.fontFamily='"'+$('fontFamily').value+'",sans-serif';draw(0)};$('captionPos').onchange=()=>draw(0);
 $('captionLang').onchange=()=>{const s={English:'Festival of Bharat',Hindi:'जय श्री महाकाल',Gujarati:'જય શ્રી મહાકાલ',Marathi:'जय श्री महाकाल',Sanskrit:'ॐ नमः शिवाय',Tamil:'ஓம் நமசிவாய',Telugu:'ఓం నమః శివాయ',Bengali:'জয় শ্রী মহাকাল',Kannada:'ಓಂ ನಮಃ ಶಿವಾಯ',Malayalam:'ഓം നമഃ ശിവായ',Punjabi:'ਜੈ ਸ਼੍ਰੀ ਮਹਾਕਾਲ'};$('captionText').value=s[$('captionLang').value]||'';$('fontPreview').textContent=$('captionText').value||'Festival of Bharat';draw(0)};
 </script>
