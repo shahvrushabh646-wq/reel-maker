@@ -64,22 +64,22 @@ function renderTemplates(){
  }).join('');
 }
 function buildSequence(){
- const imgs=results.filter(x=>x.kind==='image'), vids=results.filter(x=>x.kind==='video');
+ const imgs=selected.filter(x=>x.kind==='image'), vids=selected.filter(x=>x.kind==='video');
  if(!selected.length)return [];
- const pref=activeTemplate.mix/100;
- const source=selected.slice();
- const wantVideo=vids.length>0 && (Math.random()<pref ? false : true);
- let vi=0,ii=0,si=0;
+ const videoPct=Math.max(0,Math.min(100,+$('mix').value||0));
+ let vi=0,ii=0;
  return activeTemplate.scenes.map((sc,n)=>{
    const role=sc[0];
-   let pool;
-   if(wantVideo) pool=vids.length?vids:imgs;
-   else pool=imgs.length?imgs:vids;
-   if(role==='FAST'||role==='PEAK') pool=vids.length?vids:imgs;
-   if(role==='DETAIL') pool=imgs.length?imgs:vids;
-   if(!pool.length) pool=source;
-   const x=pool[si++%pool.length];
-   return {media:x,role:sc[0],label:sc[1],n};
+   let useVideo;
+   if(!imgs.length) useVideo=true;
+   else if(!vids.length) useVideo=false;
+   else if(role==='FAST'||role==='PEAK') useVideo=true;
+   else if(role==='DETAIL') useVideo=false;
+   else useVideo=((n*100/activeTemplate.scenes.length)<videoPct);
+   let pool=useVideo?vids:imgs;
+   if(!pool.length)pool=useVideo?imgs:vids;
+   const x=pool[(useVideo?vi++:ii++)%pool.length];
+   return {media:x,role,label:sc[1],n};
  });
 }
 function pickTemplate(i){
