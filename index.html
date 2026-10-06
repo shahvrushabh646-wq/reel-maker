@@ -261,7 +261,7 @@ $('export').onclick=async()=>{
  let rec;try{rec=new MediaRecorder(stream,{mimeType:mime,videoBitsPerSecond:8000000})}catch(e){$('qc').textContent='QC: Browser cannot record this reel';return}
  const chunks=[];
  rec.ondataavailable=e=>{if(e.data.size)chunks.push(e.data)};
- rec.onstop=()=>{
+ rec.onstop=async()=>{
    const blob=new Blob(chunks,{type:mime});
    $('qc').textContent='QC: Converting to MP4 / H.264 for Instagram Edits…';
    try{
