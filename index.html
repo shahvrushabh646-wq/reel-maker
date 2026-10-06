@@ -338,7 +338,7 @@ function sceneAt(t){
  const dur=+$('duration').value, n=sequence.length, raw=((t%dur)+dur)%dur, slot=dur/n, idx=Math.min(n-1,Math.floor(raw/slot)), local=(raw-idx*slot)/slot;
  return {scene:sequence[idx],idx,local,slot};
 }
-async function draw(t){
+async function draw(t,captureFrame=false){
  const token=renderToken,c=$('canvas'),ctx=c.getContext('2d');ctx.fillStyle='#050607';ctx.fillRect(0,0,c.width,c.height);
  if(!selected.length){ctx.fillStyle='#9aa4b0';ctx.font='48px Arial';ctx.textAlign='center';ctx.fillText('Select media to build preview',540,960);ctx.textAlign='left';return}
  const {scene,idx,local,slot}=sceneAt(t),a=scene.media;
@@ -357,7 +357,27 @@ async function draw(t){
    if(activeTemplate.motion==='reveal'){z=1.18-.12*local;py=18-36*local}
    if(activeTemplate.motion==='beat-cut'||fast)z=1.04+.04*Math.sin(local*Math.PI*2);
    if(slow)z-=.015;
-   if(isVideo){const vd=media.duration||slot;try{const target=Math.min(Math.max(0,local*vd),Math.max(0,vd-.05));if(Math.abs(media.currentTime-target)>.12)media.currentTime=target}catch{}media.play().catch(()=>{})}
+   if(isVideo){
+     const vd=media.duration||slot;
+     try{
+       const target=Math.min(Math.max(0,local*vd),Math.max(0,vd-.05));
+       if(captureFrame){
+         media.pause();
+         if(Math.abs(media.currentTime-target)>.015){
+           await new Promise(resolve=>{
+             let done=false;
+             const finish=()=>{if(done)return;done=true;media.removeEventListener('seeked',finish);resolve()};
+             media.addEventListener('seeked',finish,{once:true});
+             try{media.currentTime=target}catch{}
+             setTimeout(finish,180);
+           });
+         }
+       }else{
+         if(Math.abs(media.currentTime-target)>.12)media.currentTime=target;
+         media.play().catch(()=>{});
+       }
+     }catch{}
+   }
    fit(ctx,media,c.width,c.height,z,px,py,rot);
    if(activeTemplate.transition==='fade'&&local<.14){ctx.fillStyle='rgba(0,0,0,'+((.14-local)/.14)+')';ctx.fillRect(0,0,c.width,c.height)}
    if(activeTemplate.transition==='flash'&&local<.07){ctx.fillStyle='rgba(255,255,255,'+((.07-local)/.07*.35)+')';ctx.fillRect(0,0,c.width,c.height)}
@@ -431,6 +451,8 @@ $('export').onclick=async()=>{
    exportAudio.ontimeupdate=()=>{const end=+$('musicEnd').value||0;if(end>0&&exportAudio.currentTime>=end){exportAudio.pause();exportAudio.ontimeupdate=null}};
    try{await exportAudio.play()}catch{}
  }
+ // Draw the first deterministic frame before recording so the stream never starts blank.
+ await draw(0,true);
  rec.start(200);
  $('qc').textContent='QC: Creating reel… 0%';
  const duration=Math.max(1,+$('duration').value||15),startedAt=performance.now();
@@ -438,12 +460,12 @@ $('export').onclick=async()=>{
  while(playing){
    const elapsed=(performance.now()-startedAt)/1000;
    if(elapsed>=duration)break;
-   await draw(elapsed);
+   await draw(elapsed,true);
    $('qc').textContent='QC: Creating reel… '+Math.min(99,Math.round(elapsed/duration*100))+'%';
    await new Promise(requestAnimationFrame);
  }
  playing=false;cancelAnimationFrame(raf);
- await draw(duration-.001);
+ await draw(duration-.001,true);
  if(exportAudio){try{exportAudio.pause()}catch{}}
  rec.stop();
 };update();draw(0);
