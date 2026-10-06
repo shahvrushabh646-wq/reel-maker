@@ -93,7 +93,7 @@
 <div class="control"><label>Duration <span id="durVal">15s</span></label><input id="duration" type="range" min="8" max="60" value="15"></div>
 <div class="control"><label>Photo / Video mix <span id="mixVal">50 / 50</span></label><input id="mix" type="range" min="0" max="100" value="50"></div>
 <div class="notice"><b id="templateName">Cinematic Journey</b><br><span class="muted" id="templateDesc">Real scene blueprint selected. Media is fitted automatically.</span><div class="scene-chips" id="scenePlan"></div></div>
-<div class="phone"><canvas id="canvas" width="540" height="960"></canvas></div>
+<div class="phone"><canvas id="canvas" width="1080" height="1920"></canvas></div>
 <div class="row"><button class="primary" id="build">Build Preview</button><button class="secondary" id="play">Play</button><button class="secondary" id="stop">Stop</button></div><div class="progress"><i id="bar"></i></div>
 <div class="row"><button class="secondary" id="export">Export MP4</button><span class="muted">1080×1920 / 30fps target</span></div>
 <div class="notice" id="qc">QC: Waiting for build</div>
@@ -108,7 +108,7 @@
 </nav></div>
 <script>
 const $=id=>document.getElementById(id),selected=[],results=[];let playing=false,raf=0,started=0,activeVideo=null,audioObj=null,audioURL=null,audioCtx=null,audioSource=null,audioDest=null;
-const proxy=u=>'/proxy?url='+encodeURIComponent(u),esc=s=>String(s||'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+const proxy=u=>{if(!u)return '';if(/^\/proxy\?url=/.test(u))return u;return '/proxy?url='+encodeURIComponent(u)},esc=s=>String(s||'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
 const templateNames=[
 "Cinematic Dawn","Temple Glow","Heritage Frames","Golden Hour","Divine Light","Festival Pulse","Sacred Journey","Royal Bharat","Minimal Story","Documentary Flow",
 "Colour Burst","Soft Darshan","Ancient Streets","Modern India","Aarti Moments","Crowd Energy","Slow Reveal","Photo Journal","Temple Details","Cultural Rhythm",
@@ -295,7 +295,6 @@ function autoSelect(){
 $('generate').onclick=async()=>{if(!results.length){$('form').requestSubmit();return}autoSelect();sequence=buildSequence();renderToken++;openWorkspace('preview');await new Promise(requestAnimationFrame);await $('build').click();start()};
 const imageCache=new Map(),videoCache=new Map();
 function fit(ctx,s,cw,ch,z=1,panX=0,panY=0,rot=0){const w=s.videoWidth||s.naturalWidth||s.width,h=s.videoHeight||s.naturalHeight||s.height;if(!w||!h)return false;const sc=Math.max(cw/w,ch/h)*z;ctx.save();ctx.translate(cw/2+panX,ch/2+panY);ctx.rotate(rot);ctx.drawImage(s,-w*sc/2,-h*sc/2,w*sc,h*sc);ctx.restore();return true}
-function proxy(url){if(!url)return ''; if(/^\/proxy\?url=/.test(url))return url; return '/proxy?url='+encodeURIComponent(url)}
 function mediaCandidates(a){
  const arr=[];
  for(const u of [a?.playUrl,a?.url,a?.thumbPlay]){
@@ -342,7 +341,7 @@ function sceneAt(t){
 }
 async function draw(t){
  const token=renderToken,c=$('canvas'),ctx=c.getContext('2d');ctx.fillStyle='#050607';ctx.fillRect(0,0,c.width,c.height);
- if(!selected.length){ctx.fillStyle='#9aa4b0';ctx.font='24px Arial';ctx.textAlign='center';ctx.fillText('Select media to build preview',270,480);ctx.textAlign='left';return}
+ if(!selected.length){ctx.fillStyle='#9aa4b0';ctx.font='48px Arial';ctx.textAlign='center';ctx.fillText('Select media to build preview',540,960);ctx.textAlign='left';return}
  const {scene,idx,local,slot}=sceneAt(t),a=scene.media;
  try{
    const isVideo=a.kind==='video';
@@ -365,9 +364,9 @@ async function draw(t){
    if(activeTemplate.transition==='flash'&&local<.07){ctx.fillStyle='rgba(255,255,255,'+((.07-local)/.07*.35)+')';ctx.fillRect(0,0,c.width,c.height)}
    overlay(ctx,idx,scene.label);
    $('bar').style.width=(raw/dur*100)+'%';
- }catch(e){ctx.fillStyle='#111';ctx.fillRect(0,0,c.width,c.height);ctx.fillStyle='#ffcc80';ctx.font='20px Arial';ctx.textAlign='center';ctx.fillText('Media could not be previewed',270,450);ctx.font='14px Arial';ctx.fillText(a?.source||'Unknown source',270,480);ctx.textAlign='left'}
+ }catch(e){ctx.fillStyle='#111';ctx.fillRect(0,0,c.width,c.height);ctx.fillStyle='#ffcc80';ctx.font='40px Arial';ctx.textAlign='center';ctx.fillText('Media could not be previewed',540,900);ctx.font='28px Arial';ctx.fillText(a?.source||'Unknown source',540,960);ctx.textAlign='left'}
 }
-function overlay(ctx,idx,label){ctx.fillStyle='rgba(0,0,0,.34)';ctx.fillRect(0,0,540,120);const ff=$('fontFamily')?.value||'Noto Sans';ctx.fillStyle='#fff';ctx.font=($('fontWeight')?.value||'700')+' 27px "'+ff+'",sans-serif';ctx.fillText('Festival of Bharat',25,52);ctx.font='600 17px "'+ff+'",sans-serif';ctx.fillText((idx+1)+' / '+(sequence.length||selected.length)+' · '+(label||''),25,84);const txt=$('captionText')?.value?.trim();if(txt){ctx.textAlign='center';ctx.font=($('fontWeight')?.value||'700')+' '+($('fontSize')?.value||34)+'px "'+ff+'",sans-serif';const y=$('captionPos').value==='top'?155:$('captionPos').value==='middle'?500:875;ctx.fillStyle='rgba(0,0,0,.48)';ctx.fillRect(25,y-43,490,58);ctx.fillStyle='#fff';ctx.fillText(txt,270,y);ctx.textAlign='left'}}
+function overlay(ctx,idx,label){ctx.fillStyle='rgba(0,0,0,.34)';ctx.fillRect(0,0,1080,240);const ff=$('fontFamily')?.value||'Noto Sans';ctx.fillStyle='#fff';ctx.font=($('fontWeight')?.value||'700')+' 54px "'+ff+'",sans-serif';ctx.fillText('Festival of Bharat',50,104);ctx.font='600 34px "'+ff+'",sans-serif';ctx.fillText((idx+1)+' / '+(sequence.length||selected.length)+' · '+(label||''),50,168);const txt=$('captionText')?.value?.trim();if(txt){ctx.textAlign='center';ctx.font=($('fontWeight')?.value||'700')+' '+(($('fontSize')?.value||34)*2)+'px "'+ff+'",sans-serif';const y=$('captionPos').value==='top'?310:$('captionPos').value==='middle'?1000:1750;ctx.fillStyle='rgba(0,0,0,.48)';ctx.fillRect(50,y-86,980,116);ctx.fillStyle='#fff';ctx.fillText(txt,540,y);ctx.textAlign='left'}}
 function start(){if(playing)return;playing=true;started=performance.now();const f=n=>{if(!playing)return;draw((n-started)/1000);raf=requestAnimationFrame(f)};raf=requestAnimationFrame(f)}
 $('build').onclick=async()=>{if(!selected.length)autoSelect();if(!selected.length){$('qc').textContent='QC: Add or import media first';return}sequence=buildSequence();if(!sequence.length){$('qc').textContent='QC: No scenes could be created';return}renderToken++;$('qc').textContent='QC: Building template scenes…';openWorkspace('preview');await new Promise(requestAnimationFrame);await draw(0);$('qc').textContent='QC: '+sequence.length+' scenes · '+activeTemplate.name+' · '+$('duration').value+'s · '+(selected.filter(x=>x.kind==='video').length?'video + ':'')+(selected.filter(x=>x.kind==='image').length?'photo':'')+' media ready';};
 $('play').onclick=()=>{if(!selected.length)autoSelect();if(!selected.length)return;$('build').click().then(()=>start()).catch(()=>start());};$('stop').onclick=()=>{playing=false;cancelAnimationFrame(raf);if(activeVideo)activeVideo.pause()};
