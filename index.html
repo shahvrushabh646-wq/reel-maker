@@ -407,18 +407,4 @@ $('fontUpload').onchange=async e=>{
  }catch(err){alert('Could not load this font. Please use a valid TTF, OTF, WOFF or WOFF2 file.')}
 };
 </script>
-</body></html><script>
-$('captionText').oninput=()=>draw(0);$('fontFamily').onchange=()=>{$('fontPreview').style.fontFamily='"'+$('fontFamily').value+'",sans-serif';draw(0)};$('captionPos').onchange=()=>draw(0);
-$('captionLang').onchange=()=>{const s={English:'Festival of Bharat',Hindi:'जय श्री महाकाल',Gujarati:'જય શ્રી મહાકાલ',Marathi:'जय श्री महाकाल',Sanskrit:'ॐ नमः शिवाय',Tamil:'ஓம் நமசிவாய',Telugu:'ఓం నమః శివాయ',Bengali:'জয় শ্রী মহাকাল',Kannada:'ಓಂ ನಮಃ ಶಿವಾಯ',Malayalam:'ഓം നമഃ ശിവായ',Punjabi:'ਜੈ ਸ਼੍ਰੀ ਮਹਾਕਾਲ'};$('captionText').value=s[$('captionLang').value]||'';$('fontPreview').textContent=$('captionText').value||'Festival of Bharat';draw(0)};
-</script>
-<script>
-$('fontWeight').onchange=()=>draw(0);
-$('fontSize').oninput=e=>{$('fontSizeVal').textContent=e.target.value+'px';draw(0)};
-$('fontUploadBtn').onclick=()=>$('fontUpload').click();
-$('fontUpload').onchange=async e=>{
- const f=e.target.files[0]; if(!f)return;
- try{const name='Custom-'+f.name.replace(/[^a-zA-Z0-9]/g,'-');const face=new FontFace(name,'url('+URL.createObjectURL(f)+')');await face.load();document.fonts.add(face);
- const o=document.createElement('option');o.textContent=f.name;o.value=name;$('fontFamily').appendChild(o);$('fontFamily').value=name;$('fontPreview').style.fontFamily='"'+name+'",sans-serif';draw(0);
- }catch(err){alert('Could not load this font. Please use a valid TTF, OTF, WOFF or WOFF2 file.')}
-};
-</script>
+</body></html>
