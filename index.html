@@ -198,7 +198,6 @@ function renderTemplates(){
    let visual;
    if(m.video) visual='<video class="templateDemoMedia" muted playsinline autoplay loop controls="false" preload="auto" src="'+esc(m.video)+'"></video>';
    else visual='<div class="templateDemoFallback"><span>Video preview unavailable</span></div>';
-   else visual='<div class="templateDemoFallback"><span>'+esc(t.name)+'</span></div>';
    return '<article class="templateCard '+(activeTemplate===t?'chosen':'')+'" onclick="runTemplate('+i+');event.stopPropagation()">'+
     '<div class="templateLive">'+visual+'<div class="templatePlay">▶</div><span class="templateLiveBadge">▶ PREVIEW · '+esc(t.speed)+'</span><div class="templateDemoOverlay"><b>'+esc(t.name)+'</b><span>'+esc(t.dur)+'s · '+esc(t.cat)+' · works with photo, video or mixed media</span></div></div>'+
     '<div class="templateCardBody"><div><b>'+esc(t.name)+'</b><span>'+esc(t.desc)+'</span></div><button type="button" class="primary" onclick="runTemplate('+i+');event.stopPropagation()">Use template</button></div></article>';
