@@ -66,7 +66,7 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Noto+Sans:wght@400;600;700&family=Noto+Sans+Bengali:wght@400;700&family=Noto+Sans+Devanagari:wght@400;700&family=Noto+Sans+Gujarati:wght@400;700&family=Noto+Sans+Gurmukhi:wght@400;700&family=Noto+Sans+Kannada:wght@400;700&family=Noto+Sans+Malayalam:wght@400;700&family=Noto+Sans+Tamil:wght@400;700&family=Noto+Sans+Telugu:wght@400;700&display=swap">
 </head><body><div class="app">
-<aside class="side"><div class="brand">Festival of Bharat<small>REEL PRODUCTION STUDIO</small></div><div class="nav"><button class="active">Dashboard</button><button onclick="document.getElementById('templates').scrollIntoView()">Templates</button><button onclick="document.getElementById('music').scrollIntoView()">Music</button><button onclick="document.getElementById('fonts').scrollIntoView()">Fonts & Captions</button><button onclick="document.getElementById('media').scrollIntoView()">Media Library</button><button onclick="document.getElementById('preview').scrollIntoView()">Reel Preview</button></div><div class="footerNote">Local-first workflow<br>Real source media only<br>No fake music or fake render status</div></aside>
+<aside class="side"><div class="brand">Festival of Bharat<small>REEL PRODUCTION STUDIO</small></div><div class="nav"><button class="active">Dashboard</button><button onclick="openWorkspace('templates')">Templates</button><button onclick="openWorkspace('music')">Music</button><button onclick="openWorkspace('fonts')">Fonts & Captions</button><button onclick="openWorkspace('media')">Media Library</button><button onclick="openWorkspace('preview')">Reel Preview</button></div><div class="footerNote">Local-first workflow<br>Real source media only<br>No fake music or fake render status</div></aside>
 <main class="main">
 <div class="top"><div class="title"><h1>Reel Production Dashboard</h1><div class="muted">Create a polished 9:16 Bharat story from media, template and music.</div></div><div class="row"><span class="muted" id="statusTop">READY</span><button class="primary" id="generate">Generate Reel</button></div></div>
 <form id="form" class="search"><input id="q" class="input" required placeholder="Search Navratri, Mahadev, Ganpati, temple, Holi…"><button class="primary">Research & Load Media</button></form>
@@ -101,10 +101,10 @@
 </main>
 <nav class="mobileNav" aria-label="App navigation">
 <button class="active" onclick="window.scrollTo({top:0,behavior:'smooth'})"><b>⌂</b>Home</button>
-<button onclick="document.getElementById('media').scrollIntoView({behavior:'smooth'})"><b>▦</b>Media</button>
-<button onclick="document.getElementById('templates').scrollIntoView({behavior:'smooth'})"><b>✦</b>Templates</button>
-<button onclick="document.getElementById('music').scrollIntoView({behavior:'smooth'})"><b>♫</b>Music</button>
-<button onclick="document.getElementById('preview').scrollIntoView({behavior:'smooth'})"><b>▶</b>Preview</button>
+<button onclick="openWorkspace('media')"><b>▦</b>Media</button>
+<button onclick="openWorkspace('templates')"><b>✦</b>Templates</button>
+<button onclick="openWorkspace('music')"><b>♫</b>Music</button>
+<button onclick="openWorkspace('preview')"><b>▶</b>Preview</button>
 </nav></div>
 <script>
 const $=id=>document.getElementById(id),selected=[],results=[];let playing=false,raf=0,started=0,activeVideo=null,audioObj=null,audioURL=null,audioCtx=null,audioSource=null,audioDest=null;
