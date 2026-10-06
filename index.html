@@ -262,10 +262,23 @@ $('export').onclick=async()=>{
  const chunks=[];
  rec.ondataavailable=e=>{if(e.data.size)chunks.push(e.data)};
  rec.onstop=()=>{
-   const blob=new Blob(chunks,{type:mime}),a=document.createElement('a');
-   a.href=URL.createObjectURL(blob);a.download='festival-of-bharat-'+activeTemplate.name.toLowerCase().replace(/[^a-z0-9]+/g,'-')+'.webm';a.click();
-   setTimeout(()=>URL.revokeObjectURL(a.href),30000);
-   $('qc').textContent='QC: Reel created successfully · WebM · '+($('duration').value)+'s'+(exportAudio?' · music attached':'');
+   const blob=new Blob(chunks,{type:mime});
+   $('qc').textContent='QC: Converting to MP4 / H.264 for Instagram Edits…';
+   try{
+     const converted=await fetch('/convert-mp4',{method:'POST',headers:{'Content-Type':'video/webm'},body:blob});
+     if(!converted.ok) throw new Error(await converted.text());
+     const mp4=await converted.blob();
+     const a=document.createElement('a');
+     a.href=URL.createObjectURL(mp4);
+     a.download='festival-of-bharat-'+activeTemplate.name.toLowerCase().replace(/[^a-z0-9]+/g,'-')+'-edits-ready.mp4';
+     a.click();
+     setTimeout(()=>URL.revokeObjectURL(a.href),30000);
+     $('qc').textContent='QC: MP4/H.264 reel created · 1080×1920 · 30 FPS · Instagram Edits-ready · '+$('duration').value+'s';
+   }catch(err){
+     const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download='festival-of-bharat-'+activeTemplate.name.toLowerCase().replace(/[^a-z0-9]+/g,'-')+'.webm';a.click();
+     setTimeout(()=>URL.revokeObjectURL(a.href),30000);
+     $('qc').textContent='QC: MP4 conversion failed; WebM backup exported. '+String(err.message||err).slice(0,160);
+   }
  };
  if(exportAudio){
    exportAudio.currentTime=Math.max(0,+$('musicStart').value||0);
