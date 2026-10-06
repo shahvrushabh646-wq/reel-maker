@@ -265,7 +265,7 @@ function autoSelect(){
 $('generate').onclick=async()=>{if(!results.length){$('form').requestSubmit();return}autoSelect();sequence=buildSequence();renderToken++;openWorkspace('preview');await new Promise(requestAnimationFrame);await $('build').click();start()};
 const imageCache=new Map(),videoCache=new Map();
 function fit(ctx,s,cw,ch,z=1,panX=0,panY=0,rot=0){const w=s.videoWidth||s.naturalWidth||s.width,h=s.videoHeight||s.naturalHeight||s.height;if(!w||!h)return false;const sc=Math.max(cw/w,ch/h)*z;ctx.save();ctx.translate(cw/2+panX,ch/2+panY);ctx.rotate(rot);ctx.drawImage(s,-w*sc/2,-h*sc/2,w*sc,h*sc);ctx.restore();return true}
-function proxy(url){return url||''}
+function proxy(url){if(!url)return ''; if(/^\/proxy\?url=/.test(url))return url; return '/proxy?url='+encodeURIComponent(url)}
 function mediaCandidates(a){
  const arr=[];
  for(const u of [a?.playUrl,a?.url,a?.thumbPlay]){
