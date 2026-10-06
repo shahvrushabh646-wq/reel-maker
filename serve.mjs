@@ -18,6 +18,23 @@ const server=createServer(async(req,res)=>{
     try { const html=await readFile(resolve(root,'index.html'),'utf8'); return send(res,200,{'Content-Type':'text/html; charset=utf-8','Cache-Control':'no-store'},html); }
     catch(e){ return send(res,500,{'Content-Type':'text/plain'},'Could not read index.html'); }
   }
+  if(u.pathname==='/convert-mp4' && req.method==='POST'){
+    const chunks=[]; let size=0; const max=180*1024*1024;
+    for await (const chunk of req){ size+=chunk.length; if(size>max) return send(res,413,{'Content-Type':'text/plain'},'Video too large'); chunks.push(chunk); }
+    const input=resolve(tmpdir(),'reel-'+Date.now()+'-'+Math.random().toString(36).slice(2)+'.webm');
+    const output=resolve(tmpdir(),'reel-'+Date.now()+'-'+Math.random().toString(36).slice(2)+'.mp4');
+    try{
+      await writeFile(input,Buffer.concat(chunks));
+      await new Promise((resolveDone,reject)=>{
+        const p=spawn(ffmpegPath,['-y','-i',input,'-c:v','libx264','-preset','veryfast','-profile:v','high','-pix_fmt','yuv420p','-r','30','-movflags','+faststart','-c:a','aac','-b:a','192k',output]);
+        let err=''; p.stderr.on('data',d=>{err+=d.toString()}); p.on('error',reject);
+        p.on('close',code=>code===0?resolveDone():reject(new Error(err.slice(-2000)||'FFmpeg conversion failed')));
+      });
+      const data=await readFile(output);
+      return send(res,200,{'Content-Type':'video/mp4','Content-Length':data.length,'Content-Disposition':'attachment; filename="festival-of-bharat-edits-ready.mp4"','Cache-Control':'no-store'},data);
+    }catch(e){ return send(res,500,{'Content-Type':'application/json'},JSON.stringify({error:'MP4 conversion failed',detail:String(e.message||e)})); }
+    finally{ await Promise.allSettled([unlink(input),unlink(output)]); }
+  }
   if(u.pathname==='/music-search'){
     const q=u.searchParams.get('q')||'';
     if(!q.trim()) return send(res,400,{'Content-Type':'application/json'},JSON.stringify({error:'Missing query'}));
