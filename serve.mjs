@@ -47,15 +47,15 @@ const server=createServer(async(req,res)=>{
       const all=[];
       for(const term of queries){
         const api=new URL('https://api.openverse.org/v1/audio/');
-        for(const [k,v] of [['q',term],['page_size','20'],['license_type','commercial'],['category','music'],['filter_dead','true']]) api.searchParams.set(k,v);
+        for(const [k,v] of [['q',term],['page_size','20'],['category','music'],['filter_dead','true'],['license','cc0,pdm,by,by-sa']]) api.searchParams.set(k,v);
         let rr=await fetch(api,{headers:{'User-Agent':'Festival-of-Bharat-Reel-Maker/1.0'}});
         let body=await rr.text();
         let data=rr.ok?JSON.parse(body):null;
-        // If a commercial-license query is empty, retry with explicit commercially usable CC licenses.
+        // If the preferred CC0/public-domain/attribution set is empty, retry broadly so the search still returns playable catalog tracks.
         if(!data?.results?.length){
           const fallback=new URL(api);
-          fallback.searchParams.delete('license_type');
-          fallback.searchParams.set('license','by,by-sa,by-nd,cc0,pdm');
+          fallback.searchParams.delete('license');
+          fallback.searchParams.set('license_type','all-cc');
           rr=await fetch(fallback,{headers:{'User-Agent':'Festival-of-Bharat-Reel-Maker/1.0'}});
           body=await rr.text();
           data=rr.ok?JSON.parse(body):null;
