@@ -68,7 +68,7 @@ const server=createServer(async(req,res)=>{
 
     const results=[]; const seen=new Set(); const errors=[];
     const add=(x)=>{if(x?.url&&!seen.has(x.url)){seen.add(x.url);results.push(x)}};
-    const fetchJson=async(url,options={},ms=8000)=>{
+    const fetchJson=async(url,options={},ms=10000)=>{
       const ctl=new AbortController(); const timer=setTimeout(()=>ctl.abort(),ms);
       try{
         const r=await fetch(url,{...options,signal:ctl.signal});
@@ -77,71 +77,75 @@ const server=createServer(async(req,res)=>{
         return d;
       }finally{clearTimeout(timer)}
     };
-
-    // Wikimedia Commons is the primary photo source. Query it directly and
-    // return real upload.wikimedia.org URLs; do not make photos wait for video search.
-    try{
+    const searchWikimedia=async(searchTerm)=>{
       const api=new URL('https://commons.wikimedia.org/w/api.php');
       for(const [k,v] of [
         ['action','query'],['format','json'],['formatversion','2'],
-        ['generator','search'],['gsrsearch',q],['gsrnamespace','6'],
+        ['generator','search'],['gsrsearch',searchTerm],['gsrnamespace','6'],
         ['gsrlimit','100'],['gsrwhat','text'],['prop','imageinfo'],
         ['iiprop','url|mime|size'],['iiurlwidth','900'],['origin','*']
       ]) api.searchParams.set(k,v);
-      const d=await fetchJson(api,{headers:{
-        'User-Agent':'Festival-of-Bharat-Reel-Maker/1.1 (media search)',
+      return fetchJson(api,{headers:{
+        'User-Agent':'Festival-of-Bharat-Reel-Maker/1.2 (media search)',
         'Accept':'application/json'
-      }});
-      for(const x of (d?.query?.pages||[])){
-        const z=x?.imageinfo?.[0];
-        const mime=String(z?.mime||'').toLowerCase();
-        if(z?.url && mime.startsWith('image/')){
-          add({
-            id:'wm'+x.pageid,
-            title:x.title||'Wikimedia Commons image',
-            source:'Wikimedia Commons',
-            url:z.url,
-            thumb:z.thumburl||z.url,
-            kind:'image'
-          });
-        }
+      }},10000);
+    };
+
+    // Get photos and videos server-side together. The old flow returned as soon
+    // as photos existed and made video loading depend on a second browser call.
+    const [photoAttempt,videoAttempt]=await Promise.allSettled([
+      searchWikimedia(q),
+      searchWikimedia(q+' filetype:video')
+    ]);
+
+    const consume=(attempt)=>{
+      if(attempt.status!=='fulfilled') return;
+      for(const x of (attempt.value?.query?.pages||[])){
+        const z=x?.imageinfo?.[0], mime=String(z?.mime||'').toLowerCase();
+        if(!z?.url) continue;
+        if(mime.startsWith('image/')) add({
+          id:'wm'+x.pageid,title:x.title||'Wikimedia Commons image',
+          source:'Wikimedia Commons',url:z.url,thumb:z.thumburl||z.url,kind:'image'
+        });
+        else if(mime.startsWith('video/')) add({
+          id:'wmv'+x.pageid,title:x.title||'Wikimedia Commons video',
+          source:'Wikimedia Commons',url:z.url,thumb:z.thumburl||'',kind:'video'
+        });
       }
-    }catch(e){errors.push('Wikimedia: '+String(e.message||e))}
+    };
+    consume(photoAttempt); consume(videoAttempt);
+    if(photoAttempt.status==='rejected') errors.push('Wikimedia photos: '+String(photoAttempt.reason?.message||photoAttempt.reason));
+    if(videoAttempt.status==='rejected') errors.push('Wikimedia videos: '+String(videoAttempt.reason?.message||videoAttempt.reason));
 
-    // If Wikimedia has real photos, show them immediately. Openverse is only
-    // a fallback and therefore cannot keep the UI stuck while it is unavailable.
-    if(results.length){
-      return send(res,200,{'Content-Type':'application/json','Cache-Control':'no-store'},
-        JSON.stringify({
-          results:results.slice(0,160),
-          source:'Wikimedia Commons',
-          counts:{wikimedia:results.length,photos:results.length,videos:0},
-          errors
-        }));
-    }
-
-    try{
-      const api=new URL('https://api.openverse.org/v1/images/');
-      api.searchParams.set('q',q); api.searchParams.set('page_size','100');
-      api.searchParams.set('size','large'); api.searchParams.set('license_type','commercial,modification');
-      const d=await fetchJson(api,{headers:{
-        'User-Agent':'Festival-of-Bharat-Reel-Maker/1.1',
-        'Accept':'application/json'
-      }},8000);
-      for(const x of (d?.results||[])){
-        if(x?.url) add({
+    // Openverse is only a photo fallback.
+    if(!results.some(x=>x.kind==='image')){
+      try{
+        const api=new URL('https://api.openverse.org/v1/images/');
+        api.searchParams.set('q',q); api.searchParams.set('page_size','100');
+        api.searchParams.set('size','large'); api.searchParams.set('license_type','commercial,modification');
+        const d=await fetchJson(api,{headers:{'User-Agent':'Festival-of-Bharat-Reel-Maker/1.2','Accept':'application/json'}},10000);
+        for(const x of (d?.results||[])) if(x?.url) add({
           id:'ov'+x.id,title:x.title||'Untitled',source:'Openverse',
           url:x.url,thumb:x.thumbnail||x.url,kind:'image'
         });
-      }
-    }catch(e){errors.push('Openverse: '+String(e.message||e))}
-
-    if(!results.length){
-      return send(res,502,{'Content-Type':'application/json','Cache-Control':'no-store'},
-        JSON.stringify({error:'No media found',details:errors}));
+      }catch(e){errors.push('Openverse photos: '+String(e.message||e))}
     }
+
+    const photos=results.filter(x=>x.kind==='image').slice(0,120);
+    const videos=results.filter(x=>x.kind==='video').slice(0,40);
+    const finalResults=[...photos,...videos];
+    if(!finalResults.length) return send(res,502,{'Content-Type':'application/json','Cache-Control':'no-store'},
+      JSON.stringify({error:'No media found',details:errors}));
     return send(res,200,{'Content-Type':'application/json','Cache-Control':'no-store'},
-      JSON.stringify({results:results.slice(0,160),source:'Openverse',counts:{photos:results.length,videos:0},errors}));
+      JSON.stringify({
+        results:finalResults,
+        source:videos.length?'Wikimedia Commons':'Wikimedia Commons / Openverse',
+        counts:{
+          wikimedia:results.filter(x=>x.source==='Wikimedia Commons').length,
+          openverse:results.filter(x=>x.source==='Openverse').length,
+          photos:photos.length,videos:videos.length
+        },errors
+      }));
   }
   if(u.pathname==='/music-search'){
     const q=u.searchParams.get('q')||'';
