@@ -1,0 +1,8 @@
+{
+  "name": "festival-of-bharat-new-reel-maker",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {"start": "node serve.mjs"},
+  "engines": {"node": ">=20"}
+}
