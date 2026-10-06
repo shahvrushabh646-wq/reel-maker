@@ -39,6 +39,32 @@ const server=createServer(async(req,res)=>{
     }catch(e){ return send(res,500,{'Content-Type':'application/json'},JSON.stringify({error:'MP4 conversion failed',detail:String(e.message||e)})); }
     finally{ await Promise.allSettled([unlink(input),unlink(output)]); }
   }
+  if(u.pathname==='/media-search'){
+    const q=u.searchParams.get('q')||'';
+    if(!q.trim()) return send(res,400,{'Content-Type':'application/json'},JSON.stringify({error:'Missing query'}));
+    const results=[]; const seen=new Set();
+    const add=(x)=>{if(x?.url&&!seen.has(x.url)){seen.add(x.url);results.push(x)}};
+    const terms=[q,q+' temple',q+' festival',q+' deity',q+' India'];
+    for(const term of terms){
+      try{
+        const api=new URL('https://api.openverse.org/v1/images/');
+        api.searchParams.set('q',term); api.searchParams.set('page_size','100'); api.searchParams.set('size','large');
+        const r=await fetch(api,{headers:{'User-Agent':'Festival-of-Bharat-Reel-Maker/1.0','Accept':'application/json'}});
+        if(!r.ok) continue; const d=await r.json();
+        for(const x of (d.results||[])){ if(x.url) add({id:'ov'+x.id,title:x.title||'Untitled',source:'Openverse',url:x.url,thumb:x.thumbnail||x.url,kind:'image'}); }
+      }catch(e){ console.warn('Openverse media search failed:',e.message); }
+    }
+    for(const term of terms){
+      try{
+        const api=new URL('https://commons.wikimedia.org/w/api.php');
+        for(const [k,v] of [['action','query'],['generator','search'],['gsrsearch',term],['gsrnamespace','6'],['gsrlimit','100'],['prop','imageinfo'],['iiprop','url|mime|size'],['iiurlwidth','700'],['format','json'],['origin','*']]) api.searchParams.set(k,v);
+        const r=await fetch(api,{headers:{'User-Agent':'Festival-of-Bharat-Reel-Maker/1.0','Accept':'application/json'}});
+        if(!r.ok) continue; const d=await r.json();
+        for(const x of Object.values(d?.query?.pages||{})){ const z=x.imageinfo?.[0]; if(z?.url&&!String(z.mime||'').startsWith('video/')) add({id:'wm'+x.pageid,title:x.title||'Untitled',source:'Wikimedia Commons',url:z.url,thumb:z.thumburl||z.url,kind:'image'}); }
+      }catch(e){ console.warn('Wikimedia image search failed:',e.message); }
+    }
+    return send(res,200,{'Content-Type':'application/json','Cache-Control':'no-store'},JSON.stringify({results:results.filter(x=>x.kind==='image').slice(0,200),source:'Openverse + Wikimedia Commons',counts:{photos:results.length,videos:0}}));
+  }
   if(u.pathname==='/music-search'){
     const q=u.searchParams.get('q')||'';
     if(!q.trim()) return send(res,400,{'Content-Type':'application/json'},JSON.stringify({error:'Missing query'}));
