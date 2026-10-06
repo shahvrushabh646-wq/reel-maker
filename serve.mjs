@@ -40,37 +40,85 @@ const server=createServer(async(req,res)=>{
     finally{ await Promise.allSettled([unlink(input),unlink(output)]); }
   }
   if(u.pathname==='/media-search'){
-    const q=u.searchParams.get('q')||'';
-    if(!q.trim()) return send(res,400,{'Content-Type':'application/json'},JSON.stringify({error:'Missing query'}));
-    const results=[]; const seen=new Set(); const errors=[]; const counts={openverse:0,wikimedia:0};
+    const q=(u.searchParams.get('q')||'').trim();
+    if(!q) return send(res,400,{'Content-Type':'application/json'},JSON.stringify({error:'Missing query'}));
+
+    const results=[]; const seen=new Set(); const errors=[];
     const add=(x)=>{if(x?.url&&!seen.has(x.url)){seen.add(x.url);results.push(x)}};
-    const fetchJson=async(url,options={},ms=12000)=>{
+    const fetchJson=async(url,options={},ms=8000)=>{
       const ctl=new AbortController(); const timer=setTimeout(()=>ctl.abort(),ms);
       try{
         const r=await fetch(url,{...options,signal:ctl.signal});
-        const text=await r.text();
-        let d=null; try{d=JSON.parse(text)}catch{}
-        if(!r.ok) throw new Error('HTTP '+r.status+(d?.detail?': '+d.detail:''));
+        const body=await r.text(); let d=null; try{d=JSON.parse(body)}catch{}
+        if(!r.ok) throw new Error('HTTP '+r.status);
         return d;
       }finally{clearTimeout(timer)}
     };
-    try{
-      const api=new URL('https://api.openverse.org/v1/images/');
-      api.searchParams.set('q',q); api.searchParams.set('page_size','100'); api.searchParams.set('size','large');
-      const d=await fetchJson(api,{headers:{'User-Agent':'Festival-of-Bharat-Reel-Maker/1.0','Accept':'application/json'}});
-      for(const x of (d?.results||[])){if(x.url)add({id:'ov'+x.id,title:x.title||'Untitled',source:'Openverse',url:x.url,thumb:x.thumbnail||x.url,kind:'image'})}
-      counts.openverse=(d?.results||[]).length;
-    }catch(e){errors.push('Openverse: '+e.message)}
+
+    // Wikimedia Commons is the primary photo source. Query it directly and
+    // return real upload.wikimedia.org URLs; do not make photos wait for video search.
     try{
       const api=new URL('https://commons.wikimedia.org/w/api.php');
-      for(const [k,v] of [['action','query'],['generator','search'],['gsrsearch',q+' filetype:bitmap'],['gsrnamespace','6'],['gsrlimit','100'],['prop','imageinfo'],['iiprop','url|mime'],['iiurlwidth','700'],['format','json'],['origin','*']]) api.searchParams.set(k,v);
-      const d=await fetchJson(api,{headers:{'User-Agent':'Festival-of-Bharat-Reel-Maker/1.0 (reel-maker)','Accept':'application/json'}});
-      for(const x of Object.values(d?.query?.pages||{})){const z=x.imageinfo?.[0];if(z?.url&&!String(z.mime||'').startsWith('video/'))add({id:'wm'+x.pageid,title:x.title||'Untitled',source:'Wikimedia Commons',url:z.url,thumb:z.thumburl||z.url,kind:'image'})}
-      counts.wikimedia=Object.keys(d?.query?.pages||{}).length;
-    }catch(e){errors.push('Wikimedia: '+e.message)}
-    const photos=results.filter(x=>x.kind==='image').slice(0,200);
-    if(!photos.length&&errors.length===2)return send(res,502,{'Content-Type':'application/json','Cache-Control':'no-store'},JSON.stringify({error:'Media providers unavailable',details:errors,counts}));
-    return send(res,200,{'Content-Type':'application/json','Cache-Control':'no-store'},JSON.stringify({results:photos,source:'Openverse + Wikimedia Commons',counts:{...counts,photos:photos.length,videos:0},errors}));
+      for(const [k,v] of [
+        ['action','query'],['format','json'],['formatversion','2'],
+        ['generator','search'],['gsrsearch',q],['gsrnamespace','6'],
+        ['gsrlimit','100'],['gsrwhat','text'],['prop','imageinfo'],
+        ['iiprop','url|mime|size'],['iiurlwidth','900'],['origin','*']
+      ]) api.searchParams.set(k,v);
+      const d=await fetchJson(api,{headers:{
+        'User-Agent':'Festival-of-Bharat-Reel-Maker/1.1 (media search)',
+        'Accept':'application/json'
+      }});
+      for(const x of (d?.query?.pages||[])){
+        const z=x?.imageinfo?.[0];
+        const mime=String(z?.mime||'').toLowerCase();
+        if(z?.url && mime.startsWith('image/')){
+          add({
+            id:'wm'+x.pageid,
+            title:x.title||'Wikimedia Commons image',
+            source:'Wikimedia Commons',
+            url:z.url,
+            thumb:z.thumburl||z.url,
+            kind:'image'
+          });
+        }
+      }
+    }catch(e){errors.push('Wikimedia: '+String(e.message||e))}
+
+    // If Wikimedia has real photos, show them immediately. Openverse is only
+    // a fallback and therefore cannot keep the UI stuck while it is unavailable.
+    if(results.length){
+      return send(res,200,{'Content-Type':'application/json','Cache-Control':'no-store'},
+        JSON.stringify({
+          results:results.slice(0,160),
+          source:'Wikimedia Commons',
+          counts:{wikimedia:results.length,photos:results.length,videos:0},
+          errors
+        }));
+    }
+
+    try{
+      const api=new URL('https://api.openverse.org/v1/images/');
+      api.searchParams.set('q',q); api.searchParams.set('page_size','100');
+      api.searchParams.set('size','large'); api.searchParams.set('license_type','commercial,modification');
+      const d=await fetchJson(api,{headers:{
+        'User-Agent':'Festival-of-Bharat-Reel-Maker/1.1',
+        'Accept':'application/json'
+      }},8000);
+      for(const x of (d?.results||[])){
+        if(x?.url) add({
+          id:'ov'+x.id,title:x.title||'Untitled',source:'Openverse',
+          url:x.url,thumb:x.thumbnail||x.url,kind:'image'
+        });
+      }
+    }catch(e){errors.push('Openverse: '+String(e.message||e))}
+
+    if(!results.length){
+      return send(res,502,{'Content-Type':'application/json','Cache-Control':'no-store'},
+        JSON.stringify({error:'No media found',details:errors}));
+    }
+    return send(res,200,{'Content-Type':'application/json','Cache-Control':'no-store'},
+      JSON.stringify({results:results.slice(0,160),source:'Openverse',counts:{photos:results.length,videos:0},errors}));
   }
   if(u.pathname==='/music-search'){
     const q=u.searchParams.get('q')||'';
