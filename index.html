@@ -1,61 +1,70 @@
 <!doctype html>
-<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Festival of Bharat — Reel Maker</title>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Festival of Bharat — Reel Maker</title>
 <style>
-body{margin:0;background:#111;color:#f5eee4;font:15px Arial,sans-serif}main{max-width:1200px;margin:auto;padding:28px}h1{font-family:Georgia,serif}input,button,select{padding:11px;border-radius:8px;border:1px solid #444;background:#1c1c1c;color:#fff}button{cursor:pointer}.search{display:flex;gap:8px}.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:14px;margin-top:20px}.card{background:#1b1b1b;border:1px solid #333;border-radius:12px;padding:10px}.card img{width:100%;height:220px;object-fit:cover;border-radius:8px}.row{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin:14px 0}.pill{background:#2b241c;padding:6px 9px;border-radius:20px}.stage{display:flex;gap:20px;flex-wrap:wrap}.phone{background:#000;border:1px solid #444;border-radius:18px;padding:10px}.phone canvas{width:270px;height:480px;background:#222}.muted{color:#aaa}
-</style></head>
-<body><main>
+body{margin:0;background:#0d0d0d;color:#f5eee4;font:15px Arial,sans-serif}main{max-width:1280px;margin:auto;padding:24px}
+h1{font-family:Georgia,serif}.search{display:flex;gap:8px}.search input{flex:1}input,button,select{padding:11px;border-radius:8px;border:1px solid #444;background:#1b1b1b;color:#fff}button{cursor:pointer}.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:14px;margin-top:18px}.card{background:#191919;border:1px solid #333;border-radius:12px;padding:10px;overflow:hidden}.card img,.card video{width:100%;height:220px;object-fit:cover;border-radius:8px;background:#000}.card b{display:block;margin:8px 0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.row{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin:14px 0}.pill{background:#2b241c;padding:7px 10px;border-radius:20px}.muted{color:#aaa}.stage{display:flex;gap:24px;flex-wrap:wrap}.phone{background:#000;border:1px solid #555;border-radius:20px;padding:10px;box-shadow:0 10px 40px #000}.phone canvas{width:360px;height:640px;background:#050505;display:block}.panel{min-width:320px;flex:1}.progress{height:8px;background:#252525;border-radius:8px;overflow:hidden}.progress i{display:block;height:100%;width:0;background:#ddd}.notice{padding:12px;border:1px solid #333;border-radius:10px;background:#151515}
+</style></head><body><main>
 <h1>Festival of Bharat — Reel Maker</h1>
-<p class="muted">Standalone production workspace · search, select, preview and build a 9:16 reel.</p>
-<form id="form" class="search"><input id="q" required placeholder="Search Navratri, Mahadev, Ganpati, temple…"><button>Search</button></form>
-<div class="row"><button onclick="document.getElementById('files').click();return false">Import photos/videos</button><input id="files" type="file" accept="image/*,video/*" multiple hidden><select id="style"><option>Cinematic</option><option>Devotional</option><option>Festival</option><option>Energetic</option><option>Storytelling</option></select><button id="selectAll">Select all visible</button><button id="clear">Clear selected</button></div>
-<div class="row"><span class="pill" id="photoCount">Photos: 0</span><span class="pill" id="videoCount">Videos: 0</span><span class="pill">Target: 100+ photos + 100+ videos</span></div><div id="status" class="muted">Search results will appear here.</div><div id="grid" class="grid"></div>
-<hr style="border-color:#333;margin:28px 0"><div class="stage"><div class="phone"><canvas id="canvas" width="540" height="960"></canvas></div><div style="min-width:300px;flex:1"><h2>Reel Preview</h2><p id="selectedCount">0 selected</p><input id="audio" type="file" accept="audio/*"><div class="row"><button id="build">Build preview</button><button id="play">Play</button><button id="export">Export WebM</button></div><p class="muted">Target: 1080×1920 · 9:16 · 30 FPS. Final MP4/H.264 conversion can be added through the browser FFmpeg workflow.</p></div></div>
+<p class="muted">Standalone reel production workspace. Real licensed-source media, real moving-video preview, automatic 9:16 reel build.</p>
+<form id="form" class="search"><input id="q" required placeholder="Search Navratri, Mahadev, Ganpati, temple, Holi…"><button>Search</button></form>
+<div class="row">
+<button id="generate">Generate Reel</button><button id="selectAll">Select all visible</button><button id="clear">Clear selected</button>
+<button id="importBtn">Import photos/videos</button><input id="files" type="file" accept="image/*,video/*" multiple hidden>
+<select id="style"><option>Cinematic</option><option>Devotional</option><option>Festival</option><option>Energetic</option><option>Storytelling</option><option>Slow</option><option>Medium</option><option>Fast</option></select>
+</div>
+<div class="row"><span class="pill" id="photoCount">Photos: 0</span><span class="pill" id="videoCount">Videos: 0</span><span class="pill" id="selectedCount">0 selected</span><span class="pill">Goal: 100+ photos + 100+ videos</span></div>
+<div id="status" class="notice">Search a topic. The app will collect up to 120 photos and 120 actual video files when the sources provide them.</div>
+<div id="grid" class="grid"></div>
+<hr style="border-color:#333;margin:30px 0">
+<div class="stage"><div class="phone"><canvas id="canvas" width="540" height="960"></canvas></div>
+<div class="panel"><h2>Reel Preview</h2><p id="previewInfo" class="muted">Generate or select media to preview.</p>
+<label>Optional audio: <input id="audio" type="file" accept="audio/*"></label>
+<div class="row"><button id="build">Build preview</button><button id="play">Play</button><button id="stop">Stop</button><button id="export">Export WebM</button></div>
+<div class="progress"><i id="bar"></i></div>
+<p class="muted">Preview is 540×960 and represents the final 9:16 composition. Browser export is WebM. H.264 MP4 is not falsely advertised unless the browser/runtime actually supports it.</p></div></div>
 </main>
 <script>
-const selected=[];let results=[];let playing=false,raf=0,activeVideo=null;
+const selected=[];let results=[],playing=false,raf=0,activeVideo=null,started=0;
 const $=id=>document.getElementById(id);
-function esc(s){return String(s||'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]))}
-function updateCounts(){const p=results.filter(x=>x.kind==='image').length,v=results.filter(x=>x.kind==='video').length;$('photoCount').textContent='Photos: '+p;$('videoCount').textContent='Videos: '+v;$('selectedCount').textContent=selected.length+' selected'}
-function render(){const g=$('grid');g.innerHTML=results.map((x,i)=>'<div class="card">'+(x.kind==='video'?'<video src="'+esc(x.url)+'" poster="'+esc(x.thumb||'')+'" muted preload="metadata" controls></video>':'<img src="'+esc(x.thumb||x.url)+'" loading="lazy">')+'<b>'+esc(x.title||'Untitled')+'</b><div class="muted">'+esc(x.source||'')+'</div><button onclick="toggle('+i+')">'+(selected.some(a=>a.id===x.id)?'✓ Selected':'Select ✓')+'</button></div>').join('');updateCounts()}
-window.toggle=i=>{const x=results[i],p=selected.findIndex(a=>a.id===x.id);p>=0?selected.splice(p,1):selected.push(x);render()};
-$('clear').onclick=()=>{selected.length=0;render()};$('selectAll').onclick=()=>{results.forEach(x=>{if(!selected.some(a=>a.id===x.id))selected.push(x)});render()};
-$('files').onchange=e=>{[...e.target.files].forEach(f=>{const u=URL.createObjectURL(f);results.unshift({id:'local-'+crypto.randomUUID(),title:f.name,source:'Local file',url:u,thumb:u,kind:f.type.startsWith('video')?'video':'image'})});render()};
+const proxy=u=>'/proxy?url='+encodeURIComponent(u);
+const esc=s=>String(s||'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+function updateCounts(){ $('photoCount').textContent='Photos: '+results.filter(x=>x.kind==='image').length; $('videoCount').textContent='Videos: '+results.filter(x=>x.kind==='video').length; $('selectedCount').textContent=selected.length+' selected'; }
+function render(){ $('grid').innerHTML=results.map((x,i)=>'<div class="card">'+(x.kind==='video'?'<video src="'+esc(x.playUrl||x.url)+'" poster="'+esc(x.thumbPlay||x.thumb||'')+'" muted playsinline preload="metadata" controls></video>':'<img src="'+esc(x.thumbPlay||x.thumb||x.url)+'" loading="lazy">')+'<b title="'+esc(x.title)+'">'+esc(x.title||'Untitled')+'</b><div class="muted">'+esc(x.source||'')+'</div><button onclick="toggle('+i+')">'+(selected.some(a=>a.id===x.id)?'✓ Selected':'Select ✓')+'</button></div>').join('');updateCounts();}
+window.toggle=i=>{const x=results[i],p=selected.findIndex(a=>a.id===x.id);p>=0?selected.splice(p,1):selected.push(x);render();draw(0)};
+$('clear').onclick=()=>{selected.length=0;render();draw(0)};
+$('selectAll').onclick=()=>{results.forEach(x=>{if(!selected.some(a=>a.id===x.id))selected.push(x)});render();draw(0)};
+$('importBtn').onclick=()=>$('files').click();
+$('files').onchange=e=>{[...e.target.files].forEach(f=>{const u=URL.createObjectURL(f);results.unshift({id:'local-'+crypto.randomUUID(),title:f.name,source:'Local file',url:u,playUrl:u,thumb:u,thumbPlay:u,kind:f.type.startsWith('video')?'video':'image'})});render();autoSelect();draw(0)};
 async function getJSON(url){try{const r=await fetch(url);if(!r.ok)throw Error(r.status);return await r.json()}catch(e){return null}}
 async function search(q){
- $('status').textContent='Searching licensed media…';results=[];render();
- const out=[],seen=new Set();
- const add=x=>{if(x.url&&!seen.has(x.url)){seen.add(x.url);out.push(x)}};
- const queries=[q,q+' temple',q+' festival',q+' deity',q+' aerial',q+' cinematic',q+' detail'];
- for(const term of queries.slice(0,4)){
-   const j=await getJSON('https://api.openverse.org/v1/images/?q='+encodeURIComponent(term)+'&page_size=100&license_type=commercial,modification&size=large');
-   (j?.results||[]).forEach(x=>add({id:'ov-'+x.id,title:x.title,source:'Openverse',url:x.url,thumb:x.thumbnail||x.url,kind:'image',license:x.license,license_url:x.license_url}));
- }
- const wm=await getJSON('https://commons.wikimedia.org/w/api.php?action=query&generator=search&gsrsearch='+encodeURIComponent(q)+'&gsrnamespace=6&gsrlimit=100&prop=imageinfo&iiprop=url|mime|size&iiurlwidth=700&format=json&origin=*');
- Object.values(wm?.query?.pages||{}).forEach(x=>{const ii=x.imageinfo?.[0];if(ii?.url&&!/^video\//.test(ii.mime||''))add({id:'wm-'+x.pageid,title:x.title,source:'Wikimedia Commons',url:ii.url,thumb:ii.thumburl||ii.url,kind:'image'})});
- const wv=await getJSON('https://commons.wikimedia.org/w/api.php?action=query&generator=search&gsrsearch='+encodeURIComponent(q+' filetype:video')+'&gsrnamespace=6&gsrlimit=100&prop=imageinfo&iiprop=url|mime|size&iiurlwidth=700&format=json&origin=*');
- Object.values(wv?.query?.pages||{}).forEach(x=>{const ii=x.imageinfo?.[0];if(ii?.url&&(ii.mime||'').startsWith('video/'))add({id:'wv-'+x.pageid,title:x.title,source:'Wikimedia Commons',url:ii.url,thumb:ii.thumburl||'',kind:'video'})});
- results=out;
- const images=results.filter(x=>x.kind==='image').slice(0,100),videos=results.filter(x=>x.kind==='video').slice(0,100);
- results=[...images,...videos];
- $('status').textContent='Found '+images.length+' photos + '+videos.length+' videos. Select media for the reel.';
- render();
+ $('status').textContent='Searching licensed/open media…';results=[];selected.length=0;render();
+ const out=[],seen=new Set(); const add=x=>{if(x.url&&!seen.has(x.url)){seen.add(x.url);x.playUrl=proxy(x.url);x.thumbPlay=x.thumb?proxy(x.thumb):x.playUrl;out.push(x)}};
+ const imageTerms=[q,q+' temple',q+' festival',q+' deity',q+' aerial',q+' cinematic'];
+ for(const term of imageTerms){const j=await getJSON('https://api.openverse.org/v1/images/?q='+encodeURIComponent(term)+'&page_size=100&license_type=commercial,modification&size=large');(j?.results||[]).forEach(x=>add({id:'ov-'+x.id,title:x.title,source:'Openverse',url:x.url,thumb:x.thumbnail||x.url,kind:'image',license:x.license,license_url:x.license_url}));}
+ const wmTerms=[q,q+' temple',q+' festival',q+' deity',q+' architecture',q+' India'];
+ for(const term of wmTerms){const wm=await getJSON('https://commons.wikimedia.org/w/api.php?action=query&generator=search&gsrsearch='+encodeURIComponent(term)+'&gsrnamespace=6&gsrlimit=100&prop=imageinfo&iiprop=url|mime|size&iiurlwidth=700&format=json&origin=*');Object.values(wm?.query?.pages||{}).forEach(x=>{const ii=x.imageinfo?.[0];if(ii?.url&&!/^video\//.test(ii.mime||''))add({id:'wm-'+x.pageid,title:x.title,source:'Wikimedia Commons',url:ii.url,thumb:ii.thumburl||ii.url,kind:'image'})});}
+ const videoTerms=[q+' filetype:video',q+' temple filetype:video',q+' festival filetype:video',q+' India filetype:video',q+' aerial filetype:video',q+' cinematic filetype:video'];
+ for(const term of videoTerms){const wv=await getJSON('https://commons.wikimedia.org/w/api.php?action=query&generator=search&gsrsearch='+encodeURIComponent(term)+'&gsrnamespace=6&gsrlimit=100&prop=imageinfo&iiprop=url|mime|size&iiurlwidth=700&format=json&origin=*');Object.values(wv?.query?.pages||{}).forEach(x=>{const ii=x.imageinfo?.[0];if(ii?.url&&(ii.mime||'').startsWith('video/'))add({id:'wv-'+x.pageid,title:x.title,source:'Wikimedia Commons',url:ii.url,thumb:ii.thumburl||'',kind:'video',mime:ii.mime})});}
+ const imgs=out.filter(x=>x.kind==='image').slice(0,120), vids=out.filter(x=>x.kind==='video').slice(0,120); results=[...imgs,...vids];
+ $('status').textContent='Found '+imgs.length+' photos + '+vids.length+' actual video files. '+(vids.length<100?'The available public video search returned fewer than 100; no fake results were added.':'100+ videos available.');
+ render();autoSelect();draw(0);
 }
-$('form').onsubmit=e=>{e.preventDefault();search($('q').value.trim())};
-function fitDraw(ctx,src,cw,ch,zoom=1){const w=src.videoWidth||src.naturalWidth||src.width,h=src.videoHeight||src.naturalHeight||src.height;if(!w||!h)return;const sc=Math.max(cw/w,ch/h)*zoom,ww=w*sc,hh=h*sc;ctx.drawImage(src,(cw-ww)/2,(ch-hh)/2,ww,hh)}
-function draw(t=0){
- const c=$('canvas'),ctx=c.getContext('2d');ctx.fillStyle='#080808';ctx.fillRect(0,0,c.width,c.height);
- if(!selected.length){ctx.fillStyle='#aaa';ctx.font='24px Arial';ctx.fillText('Select photos or videos',65,480);return}
- const a=selected[Math.floor(t/3)%selected.length];
- if(a.kind==='video'){
-   if(!activeVideo||activeVideo.src!==a.url){if(activeVideo){activeVideo.pause()}activeVideo=document.createElement('video');activeVideo.src=a.url;activeVideo.muted=true;activeVideo.playsInline=true;activeVideo.crossOrigin='anonymous';activeVideo.play().catch(()=>{})}
-   fitDraw(ctx,activeVideo,c.width,c.height,1+0.025*Math.sin(t));
- }else{
-   const im=new Image();im.crossOrigin='anonymous';im.onload=()=>{ctx.save();fitDraw(ctx,im,c.width,c.height,1+0.035*Math.sin(t));ctx.restore()};im.src=a.url||a.thumb;
- }
- ctx.fillStyle='rgba(0,0,0,.25)';ctx.fillRect(0,0,c.width,110);ctx.fillStyle='#fff';ctx.font='bold 28px Arial';ctx.fillText('Festival of Bharat',28,65);
-}
-$('build').onclick=()=>draw(0);
-$('play').onclick=()=>{playing=!playing;if(playing){const st=performance.now();const tick=n=>{if(!playing)return;draw((n-st)/1000);raf=requestAnimationFrame(tick)};raf=requestAnimationFrame(tick)}else if(activeVideo)activeVideo.pause()};
-$('export').onclick=async()=>{if(!selected.length)return alert('Select media first');const c=$('canvas'),stream=c.captureStream(30),rec=new MediaRecorder(stream),chunks=[];rec.ondataavailable=e=>e.data.size&&chunks.push(e.data);rec.onstop=()=>{const a=document.createElement('a');a.href=URL.createObjectURL(new Blob(chunks,{type:'video/webm'}));a.download='festival-of-bharat-reel.webm';a.click()};rec.start();const st=performance.now(),duration=15000;const tick=n=>{draw((n-st)/1000);if(n-st<duration)requestAnimationFrame(tick);else rec.stop()};requestAnimationFrame(tick)};
+function autoSelect(){selected.length=0;const imgs=results.filter(x=>x.kind==='image'),vids=results.filter(x=>x.kind==='video');let i=0,v=0;while(selected.length<12&&(i<imgs.length||v<vids.length)){if(v<vids.length&&(selected.length%3===2||i>=imgs.length)){selected.push(vids[v++])}else if(i<imgs.length){selected.push(imgs[i++])}else break}updateCounts();$('previewInfo').textContent=selected.length+' media selected automatically for the first preview.';}
+$('form').onsubmit=e=>{e.preventDefault();const q=$('q').value.trim();if(q)search(q)};
+$('generate').onclick=()=>{if(!results.length)return $('form').requestSubmit();autoSelect();draw(0);startPlay()};
+function fitDraw(ctx,src,cw,ch,zoom=1){const w=src.videoWidth||src.naturalWidth||src.width,h=src.videoHeight||src.naturalHeight||src.height;if(!w||!h)return false;const sc=Math.max(cw/w,ch/h)*zoom,ww=w*sc,hh=h*sc;ctx.drawImage(src,(cw-ww)/2,(ch-hh)/2,ww,hh);return true}
+function draw(t=0){const c=$('canvas'),ctx=c.getContext('2d');ctx.fillStyle='#080808';ctx.fillRect(0,0,c.width,c.height);if(!selected.length){ctx.fillStyle='#aaa';ctx.font='24px Arial';ctx.fillText('Search and generate a reel',75,480);return}
+ const idx=Math.floor(t/3)%selected.length,a=selected[idx];let ok=false;
+ if(a.kind==='video'){if(!activeVideo||activeVideo.dataset.id!==a.id){if(activeVideo)activeVideo.pause();activeVideo=document.createElement('video');activeVideo.dataset.id=a.id;activeVideo.src=a.playUrl||proxy(a.url);activeVideo.muted=true;activeVideo.playsInline=true;activeVideo.preload='auto';activeVideo.crossOrigin='anonymous';activeVideo.play().catch(()=>{})}if(activeVideo.readyState>=2)ok=fitDraw(ctx,activeVideo,c.width,c.height,1+0.025*Math.sin(t*1.4));}
+ else{const im=new Image();im.crossOrigin='anonymous';im.onload=()=>{drawImageFrame(im,t,a)};im.src=a.playUrl||proxy(a.url||a.thumb);return;}
+ overlay(ctx,a,idx,ok);$('bar').style.width=((t%3)/3*100)+'%';}
+function drawImageFrame(im,t,a){const c=$('canvas'),ctx=c.getContext('2d');ctx.fillStyle='#080808';ctx.fillRect(0,0,c.width,c.height);fitDraw(ctx,im,c.width,c.height,1+0.045*Math.sin(t*1.1));overlay(ctx,a,Math.floor(t/3)%selected.length,true)}
+function overlay(ctx,a,idx,ok){ctx.fillStyle='rgba(0,0,0,.30)';ctx.fillRect(0,0,ctx.canvas.width,115);ctx.fillStyle='#fff';ctx.font='bold 28px Arial';ctx.fillText('Festival of Bharat',28,58);ctx.font='18px Arial';ctx.fillText((idx+1)+' / '+selected.length,28,90);if(!ok){ctx.font='18px Arial';ctx.fillText('Loading media…',28,150)}}
+function startPlay(){if(playing)return;playing=true;started=performance.now();const tick=n=>{if(!playing)return;draw((n-started)/1000);raf=requestAnimationFrame(tick)};raf=requestAnimationFrame(tick)}
+$('build').onclick=()=>{if(!selected.length)autoSelect();draw(0)};
+$('play').onclick=startPlay;
+$('stop').onclick=()=>{playing=false;cancelAnimationFrame(raf);if(activeVideo)activeVideo.pause()};
+$('export').onclick=async()=>{if(!selected.length)autoSelect();const c=$('canvas'),stream=c.captureStream(30);let mime='video/webm;codecs=vp9';if(!MediaRecorder.isTypeSupported(mime))mime='video/webm';const rec=new MediaRecorder(stream,{mimeType:mime,videoBitsPerSecond:8000000}),chunks=[];rec.ondataavailable=e=>e.data.size&&chunks.push(e.data);rec.onstop=()=>{const blob=new Blob(chunks,{type:mime});const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download='festival-of-bharat-reel.webm';a.click();$('status').textContent='Export complete: WebM reel generated.'};rec.start(250);const st=performance.now(),duration=15000;playing=true;const tick=n=>{draw((n-st)/1000);if(n-st<duration)requestAnimationFrame(tick);else{playing=false;rec.stop()}};requestAnimationFrame(tick)};
 draw();
 </script></body></html>
