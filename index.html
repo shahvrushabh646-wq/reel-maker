@@ -160,11 +160,16 @@ function buildSequence(){
    return {media:x,role,label:sc[1],n};
  }).filter(x=>x.media);
 }
+const BUILTIN_TEMPLATE_VIDEOS=[
+ 'https://commons.wikimedia.org/wiki/Special:Redirect/file/Tukai_Mata_Mandir_rajgurunagar_maharashtra_india_rupaksane.webm',
+ 'https://commons.wikimedia.org/wiki/Special:Redirect/file/KERALA_TEMPLE_CHENDA_MELAM_DURING_FESTIVEL.webm',
+ 'https://commons.wikimedia.org/wiki/Special:Redirect/file/Sri_Sri_Iswar_Madan_Mohan_Jew_-_Temple_Aarti.webm'
+];
 function templateDemoMedia(i){
  const imgs=results.filter(x=>x.kind==='image'), vids=results.filter(x=>x.kind==='video');
  const im=imgs.length?imgs[i%imgs.length]:null, vd=vids.length?vids[i%vids.length]:null;
  const photo=im?.thumbPlay||im?.url||'';
- const video=vd?.thumbPlay||vd?.url||'';
+ const video=vd?.playUrl||vd?.url||BUILTIN_TEMPLATE_VIDEOS[i%BUILTIN_TEMPLATE_VIDEOS.length];
  return {photo,video};
 }
 function renderTemplates(){
