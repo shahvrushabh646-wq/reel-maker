@@ -200,6 +200,30 @@ function playTemplateVideos(root=document){
    videos.forEach(activate);
  }
 }
+function toggleTemplateDemo(event,button){
+ event?.stopPropagation();
+ const card=button?.closest('.templateCard');
+ if(!card)return;
+ const v=card.querySelector('video.templateDemoMedia');
+ if(!v)return;
+ document.querySelectorAll('#templateList video.templateDemoMedia').forEach(x=>{
+   if(x!==v){try{x.pause()}catch{}}
+ });
+ if(!v.src){
+   const src=v.dataset.src;
+   if(src){v.src=src;v.preload='auto';}
+ }
+ v.muted=true;v.defaultMuted=true;v.playsInline=true;
+ if(v.paused){
+   const p=v.play();
+   if(p&&p.catch)p.catch(()=>{});
+   button.textContent='❚❚';
+ }else{
+   v.pause();
+   button.textContent='▶';
+ }
+}
+window.toggleTemplateDemo=toggleTemplateDemo;
 function renderTemplates(){
  const tabs=$('templateTabs'),list=$('templateList');
  if(!tabs||!list)return;
@@ -218,7 +242,7 @@ function renderTemplates(){
    if(m.video) visual='<video class="templateDemoMedia" muted playsinline loop preload="none" data-src="'+esc(m.video)+'" poster="'+esc(m.photo||'')+'"></video>';
    else visual='<div class="templateDemoFallback"><span>Real preview will load when visible</span></div>';
    return '<article class="templateCard '+(activeTemplate===t?'chosen':'')+'" onclick="runTemplate('+i+');event.stopPropagation()">'+
-    '<div class="templateLive">'+visual+'<div class="templatePlay">▶</div><span class="templateLiveBadge">▶ PREVIEW · '+esc(t.speed)+'</span><div class="templateDemoOverlay"><b>'+esc(t.name)+'</b><span>'+esc(t.dur)+'s · '+esc(t.cat)+' · works with photo, video or mixed media</span></div></div>'+
+    '<div class="templateLive">'+visual+'<button type="button" class="templatePlay" aria-label="Play template preview" onclick="toggleTemplateDemo(event,this)">▶</button><span class="templateLiveBadge">▶ PREVIEW · '+esc(t.speed)+'</span><div class="templateDemoOverlay"><b>'+esc(t.name)+'</b><span>'+esc(t.dur)+'s · '+esc(t.cat)+' · works with photo, video or mixed media</span></div></div>'+
     '<div class="templateCardBody"><div><b>'+esc(t.name)+'</b><span>'+esc(t.desc)+'</span></div><button type="button" class="primary" onclick="runTemplate('+i+');event.stopPropagation()">Use template</button></div></article>';
  }).join('')||'<div class="notice" style="grid-column:1/-1">No templates match this search.</div>';
  playTemplateVideos($('templateList'));
@@ -363,7 +387,7 @@ async function draw(t,captureFrame=false){
  const {scene,idx,local,slot}=sceneAt(t),a=scene.media;
  try{
    const isVideo=a.kind==='video';
-   let media=isVideo?await loadVideo(a):await loadImage(a.playUrl);
+   let media=isVideo?await loadVideo(a):await loadImage(a.playUrl||a.url||a.thumbPlay);
    if(token!==renderToken)return;
    const speed=$('speed').value,fast=speed.includes('Fast'),slow=speed.includes('Slow');
    let z=1.02+.07*local,px=0,py=0,rot=0;
@@ -406,8 +430,26 @@ async function draw(t,captureFrame=false){
 }
 function overlay(ctx,idx,label){ctx.fillStyle='rgba(0,0,0,.34)';ctx.fillRect(0,0,1080,240);const ff=$('fontFamily')?.value||'Noto Sans';ctx.fillStyle='#fff';ctx.font=($('fontWeight')?.value||'700')+' 54px "'+ff+'",sans-serif';ctx.fillText('Festival of Bharat',50,104);ctx.font='600 34px "'+ff+'",sans-serif';ctx.fillText((idx+1)+' / '+(sequence.length||selected.length)+' · '+(label||''),50,168);const txt=$('captionText')?.value?.trim();if(txt){ctx.textAlign='center';ctx.font=($('fontWeight')?.value||'700')+' '+(($('fontSize')?.value||34)*2)+'px "'+ff+'",sans-serif';const y=$('captionPos').value==='top'?310:$('captionPos').value==='middle'?1000:1750;ctx.fillStyle='rgba(0,0,0,.48)';ctx.fillRect(50,y-86,980,116);ctx.fillStyle='#fff';ctx.fillText(txt,540,y);ctx.textAlign='left'}}
 function start(){if(playing)return;playing=true;started=performance.now();const f=n=>{if(!playing)return;draw((n-started)/1000);raf=requestAnimationFrame(f)};raf=requestAnimationFrame(f)}
-$('build').onclick=async()=>{if(!selected.length)autoSelect();if(!selected.length){$('qc').textContent='QC: Add or import media first';return}sequence=buildSequence();if(!sequence.length){$('qc').textContent='QC: No scenes could be created';return}renderToken++;$('qc').textContent='QC: Building template scenes…';openWorkspace('preview');await new Promise(requestAnimationFrame);await draw(0);$('qc').textContent='QC: '+sequence.length+' scenes · '+activeTemplate.name+' · '+$('duration').value+'s · '+(selected.filter(x=>x.kind==='video').length?'video + ':'')+(selected.filter(x=>x.kind==='image').length?'photo':'')+' media ready';};
-$('play').onclick=()=>{if(!selected.length)autoSelect();if(!selected.length)return;$('build').click().then(()=>start()).catch(()=>start());};$('stop').onclick=()=>{playing=false;cancelAnimationFrame(raf);if(activeVideo)activeVideo.pause()};
+$('build').onclick=async()=>{
+ if(!selected.length)autoSelect();
+ if(!selected.length){$('qc').textContent='QC: Add or import media first';return false}
+ sequence=buildSequence();
+ if(!sequence.length){$('qc').textContent='QC: No scenes could be created';return false}
+ playing=false;cancelAnimationFrame(raf);renderToken++;
+ $('qc').textContent='QC: Building '+sequence.length+' scenes…';
+ openWorkspace('preview');
+ await new Promise(requestAnimationFrame);
+ try{
+   await draw(0);
+   $('qc').textContent='QC: '+sequence.length+' scenes · '+activeTemplate.name+' · '+$('duration').value+'s · READY';
+   start();
+   return true;
+ }catch(e){
+   $('qc').textContent='QC: Build failed — '+String(e.message||e);
+   return false;
+ }
+};
+$('play').onclick=async()=>{const ok=await $('build').onclick();if(ok&&!playing)start();};$('stop').onclick=()=>{playing=false;cancelAnimationFrame(raf);if(activeVideo)activeVideo.pause()};
 let selectedMusic=null,musicResults=[],musicPreview=null;
 function musicEsc(s){return String(s||'').replace(/[&<>\"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));}
 function renderMusic(){
