@@ -27,14 +27,16 @@ const server=createServer(async(req,res)=>{
         id:'jamendo-'+x.id,name:x.name,artist_name:x.artist_name||'Unknown artist',
         duration:+x.duration||0,audio:x.audio,license:x.license_ccurl||'Jamendo Pro',
         license_ccurl:x.license_ccurl||'',audiodownload_allowed:!!x.audiodownload_allowed,
-        source:'Jamendo',landing:x.shareurl||''
+        album_image:x.album_image||x.image||'',source:'Jamendo',landing:x.shareurl||''
       }));
     };
     const searchJamendo=async()=>{
       const client=process.env.JAMENDO_CLIENT_ID;
       if(!client) return [];
       const api=new URL('https://api.jamendo.com/v3.0/tracks/');
-      for(const [k,v] of [['client_id',client],['format','json'],['limit','20'],['search',q],['order','relevance'],['audioformat','mp32'],['include','musicinfo'],['prolicensing','true'],['type','single albumtrack']]) api.searchParams.set(k,v);
+      for(const [k,v] of [['client_id',client],['format','json'],['limit','30'],['search',q],['order','relevance'],['audioformat','mp32'],['include','licenses musicinfo'],['type','single albumtrack']]) api.searchParams.set(k,v);
+      // Ask Jamendo for commercial tracks when the account supports Pro licensing.
+      api.searchParams.set('prolicensing','true');
       const r=await fetch(api,{headers:{'User-Agent':'Festival-of-Bharat-Reel-Maker/1.0'}});
       const body=await r.text();
       if(!r.ok) throw Error('Jamendo HTTP '+r.status);
