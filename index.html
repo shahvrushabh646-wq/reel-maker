@@ -143,19 +143,22 @@ function buildSequence(){
  if(!selected.length)return [];
  const videoPct=Math.max(0,Math.min(100,+$('mix').value||0));
  let vi=0,ii=0;
+ const mode=!imgs.length?'video-only':!vids.length?'photo-only':'mixed';
  return activeTemplate.scenes.map((sc,n)=>{
    const role=sc[0];
    let useVideo;
-   if(!imgs.length) useVideo=true;
-   else if(!vids.length) useVideo=false;
+   if(mode==='video-only') useVideo=true;
+   else if(mode==='photo-only') useVideo=false;
    else if(role==='FAST'||role==='PEAK') useVideo=true;
    else if(role==='DETAIL') useVideo=false;
    else useVideo=((n*100/activeTemplate.scenes.length)<videoPct);
-   let pool=useVideo?vids:imgs;
-   if(!pool.length)pool=useVideo?imgs:vids;
-   const x=pool[(useVideo?vi++:ii++)%pool.length];
+   const pool=useVideo?vids:imgs;
+   const fallback=useVideo?imgs:vids;
+   const sourcePool=pool.length?pool:fallback;
+   if(!sourcePool.length)return {media:null,role,label:sc[1],n};
+   const x=sourcePool[(useVideo?vi++:ii++)%sourcePool.length];
    return {media:x,role,label:sc[1],n};
- });
+ }).filter(x=>x.media);
 }
 function templateDemoMedia(i){
  const imgs=results.filter(x=>x.kind==='image'), vids=results.filter(x=>x.kind==='video');
@@ -185,7 +188,7 @@ function renderTemplates(){
    else if(m.photo) visual='<img class="templateDemoMedia" src="'+esc(m.photo)+'" alt="">';
    else visual='<div class="templateDemoFallback"><span>'+esc(t.name)+'</span></div>';
    return '<article class="templateCard '+(activeTemplate===t?'chosen':'')+'">'+
-     '<div class="templateLive">'+visual+'<span class="templateLiveBadge">LIVE DEMO · '+esc(t.speed)+'</span><div class="templateDemoOverlay"><b>'+esc(t.name)+'</b><span>'+esc(t.dur)+'s · 50/50 media mix</span></div></div>'+
+     '<div class="templateLive">'+visual+'<span class="templateLiveBadge">LIVE DEMO · '+esc(t.speed)+'</span><div class="templateDemoOverlay"><b>'+esc(t.name)+'</b><span>'+esc(t.dur)+'s · adaptive media</span></div></div>'+
      '<div class="templateCardBody"><div><b>'+esc(t.name)+'</b><span>'+esc(t.desc)+'</span></div><button class="primary" onclick="pickTemplate('+i+');openWorkspace(\'preview\');event.stopPropagation()">Use this template</button></div></article>';
  }).join('') || '<div class="notice" style="grid-column:1/-1">No templates match this search.</div>';
 }
@@ -211,7 +214,15 @@ for(const term of [q,q+' temple',q+' festival',q+' deity',q+' architecture',q+' 
 for(const term of [q+' filetype:video',q+' temple filetype:video',q+' festival filetype:video',q+' India filetype:video',q+' aerial filetype:video',q+' cinematic filetype:video']){const j=await json('https://commons.wikimedia.org/w/api.php?action=query&generator=search&gsrsearch='+encodeURIComponent(term)+'&gsrnamespace=6&gsrlimit=100&prop=imageinfo&iiprop=url|mime|size&iiurlwidth=700&format=json&origin=*');Object.values(j?.query?.pages||{}).forEach(x=>{const z=x.imageinfo?.[0];if(z?.url&&String(z.mime||'').startsWith('video/'))add({id:'wv'+x.pageid,title:x.title,source:'Wikimedia Commons',url:z.url,thumb:z.thumburl||'',kind:'video'})})}
 results.push(...out.filter(x=>x.kind==='image').slice(0,120),...out.filter(x=>x.kind==='video').slice(0,120));$('sourceStatus').textContent='Loaded '+results.filter(x=>x.kind==='image').length+' photos + '+results.filter(x=>x.kind==='video').length+' videos';$('statusTop').textContent='READY';autoSelect();sequence=buildSequence();render();renderToken++;draw(0);}
 $('form').onsubmit=e=>{e.preventDefault();search($('q').value.trim())};
-function autoSelect(){selected.length=0;const im=results.filter(x=>x.kind==='image'),vi=results.filter(x=>x.kind==='video');let a=0,b=0;while(selected.length<16&&(a<im.length||b<vi.length)){if(b<vi.length&&selected.length%3===2)selected.push(vi[b++]);else if(a<im.length)selected.push(im[a++]);else if(b<vi.length)selected.push(vi[b++]);else break}update();}
+function autoSelect(){
+ selected.length=0;
+ const im=results.filter(x=>x.kind==='image'),vi=results.filter(x=>x.kind==='video');
+ // Adaptive selection: never require a 50/50 library. One photo or one video is enough to build a reel.
+ if(!im.length&&vi.length){for(let i=0;i<Math.min(16,vi.length);i++)selected.push(vi[i]);}
+ else if(!vi.length&&im.length){for(let i=0;i<Math.min(16,im.length);i++)selected.push(im[i]);}
+ else {let a=0,b=0;while(selected.length<16&&(a<im.length||b<vi.length)){if(selected.length%2===0&&a<im.length)selected.push(im[a++]);else if(b<vi.length)selected.push(vi[b++]);else if(a<im.length)selected.push(im[a++]);}}
+ update();
+}
 $('generate').onclick=async()=>{if(!results.length){$('form').requestSubmit();return}autoSelect();sequence=buildSequence();renderToken++;openWorkspace('preview');await new Promise(requestAnimationFrame);await $('build').click();start()};
 const imageCache=new Map(),videoCache=new Map();
 function fit(ctx,s,cw,ch,z=1,panX=0,panY=0,rot=0){const w=s.videoWidth||s.naturalWidth||s.width,h=s.videoHeight||s.naturalHeight||s.height;if(!w||!h)return false;const sc=Math.max(cw/w,ch/h)*z;ctx.save();ctx.translate(cw/2+panX,ch/2+panY);ctx.rotate(rot);ctx.drawImage(s,-w*sc/2,-h*sc/2,w*sc,h*sc);ctx.restore();return true}
