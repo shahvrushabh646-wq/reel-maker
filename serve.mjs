@@ -45,12 +45,20 @@ const server=createServer(async(req,res)=>{
       const all=[];
       for(const term of queries){
         const api=new URL('https://api.openverse.org/v1/audio/');
-        for(const [k,v] of [['q',term],['page_size','20'],['license_type','commercial,modification'],['filter_dead','true']]) api.searchParams.set(k,v);
-        const rr=await fetch(api,{headers:{'User-Agent':'Festival-of-Bharat-Reel-Maker/1.0'}});
-        const body=await rr.text();
-        if(!rr.ok) continue;
-        const data=JSON.parse(body);
-        for(const x of (data.results||[])){
+        for(const [k,v] of [['q',term],['page_size','20'],['license_type','commercial'],['category','music'],['filter_dead','true']]) api.searchParams.set(k,v);
+        let rr=await fetch(api,{headers:{'User-Agent':'Festival-of-Bharat-Reel-Maker/1.0'}});
+        let body=await rr.text();
+        let data=rr.ok?JSON.parse(body):null;
+        // If a commercial-license query is empty, retry with explicit commercially usable CC licenses.
+        if(!data?.results?.length){
+          const fallback=new URL(api);
+          fallback.searchParams.delete('license_type');
+          fallback.searchParams.set('license','by,by-sa,by-nd,cc0,pdm');
+          rr=await fetch(fallback,{headers:{'User-Agent':'Festival-of-Bharat-Reel-Maker/1.0'}});
+          body=await rr.text();
+          data=rr.ok?JSON.parse(body):null;
+        }
+        for(const x of (data?.results||[])){
           if(x?.url && !all.some(y=>y.id===x.id)) all.push(x);
         }
       }
