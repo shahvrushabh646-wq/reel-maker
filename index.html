@@ -305,7 +305,7 @@ async function search(q){
   q=String(q||'').trim();
   if(!q)return;
   $('statusTop').textContent='RESEARCHING';
-  $('sourceStatus').textContent='Searching Openverse + Wikimedia…';
+  $('sourceStatus').textContent='Searching real photos + videos…';
   results.length=0; selected.length=0; render();
   try{
     const r=await fetch('/media-search?q='+encodeURIComponent(q),{cache:'no-store'});
@@ -314,16 +314,8 @@ async function search(q){
     const out=[],seen=new Set();
     const add=x=>{if(x?.url&&!seen.has(x.url)){seen.add(x.url);x.playUrl=proxy(x.url);x.thumbPlay=x.thumb?proxy(x.thumb):x.playUrl;out.push(x)}};
     (d?.results||[]).forEach(add);
-    // Fetch a small, independent Wikimedia video batch in parallel so photos do not wait for videos.
-    try{
-      const u='https://commons.wikimedia.org/w/api.php?action=query&format=json&formatversion=2&generator=search&gsrsearch='+encodeURIComponent(q)+'&gsrnamespace=6&gsrlimit=100&gsrwhat=text&prop=imageinfo&iiprop=url|mime|size&iiurlwidth=640&origin=*';
-      const v=await fetch(u,{cache:'no-store'});
-      const j=await v.json().catch(()=>null);
-      Object.values(j?.query?.pages||{}).forEach(x=>{
-        const z=x.imageinfo?.[0];
-        if(z?.url&&String(z.mime||'').startsWith('video/')) add({id:'wv'+x.pageid,title:x.title||'Wikimedia video',source:'Wikimedia Commons',url:z.url,thumb:z.thumburl||'',kind:'video'});
-      });
-    }catch{}
+    // The server now returns photos and videos together, so no second
+    // browser-side Wikimedia request is needed here.
     results.push(...out.filter(x=>x.kind==='image').slice(0,120),...out.filter(x=>x.kind==='video').slice(0,40));
     const pc=results.filter(x=>x.kind==='image').length, vc=results.filter(x=>x.kind==='video').length;
     $('sourceStatus').textContent='Loaded '+pc+' photos + '+vc+' videos';
