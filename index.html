@@ -361,7 +361,7 @@ function renderTemplates(){
  const cats=['All','Slow','Fast','Mixed'];
  $('templateTabs').innerHTML=cats.map(x=>{
    const count=x==='All'?150:50;
-   return '<button class="tab '+(templateCat===x?'active':'')+'" onclick="setTemplateCat(&quot;'+x+'&quot;)">'+esc(x)+' <span style="opacity:.65">('+count+')</span></button>';
+   return '<button class="tab '+(templateCat===x?'active':'')+'" onclick="setCat(&quot;'+x+'&quot;)">'+esc(x)+' <span style="opacity:.65">('+count+')</span></button>';
  }).join('');
  const query=String($('templateSearch')?.value||'').trim().toLowerCase();
  const filtered=templates.map((t,i)=>({t,i})).filter(({t})=>{
