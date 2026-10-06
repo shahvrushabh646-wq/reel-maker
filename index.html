@@ -252,7 +252,7 @@ function renderTemplates(){
      visual='<div class="templateDemoFallback"><span>Select media to preview this template</span></div>';
    }
    return '<article class="templateCard '+(activeTemplate===t?'chosen':'')+'" onclick="runTemplate('+i+');event.stopPropagation()">'+
-    '<div class="templateLive">'+visual+'<button type="button" class="templatePlay" aria-label="Play template preview" onclick="toggleTemplateDemo(event,this)">▶</button><span class="templateLiveBadge">▶ PREVIEW · '+esc(t.speed)+'</span><div class="templateDemoOverlay"><b>'+esc(t.name)+'</b><span>'+esc(t.dur)+'s · '+esc(t.cat)+' · works with photo, video or mixed media</span></div></div>'+
+    '<div class="templateLive">'+visual+(m.video?'<button type="button" class="templatePlay" aria-label="Play template preview" onclick="toggleTemplateDemo(event,this)">▶</button>':'')+'<span class="templateLiveBadge">▶ PREVIEW · '+esc(t.speed)+'</span><div class="templateDemoOverlay"><b>'+esc(t.name)+'</b><span>'+esc(t.dur)+'s · '+esc(t.cat)+' · works with photo, video or mixed media</span></div></div>'+
     '<div class="templateCardBody"><div><b>'+esc(t.name)+'</b><span>'+esc(t.desc)+'</span></div><button type="button" class="primary" onclick="runTemplate('+i+');event.stopPropagation()">Use template</button></div></article>';
  }).join('')||'<div class="notice" style="grid-column:1/-1">No templates match this search.</div>';
  playTemplateVideos($('templateList'));
