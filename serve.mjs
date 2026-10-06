@@ -41,13 +41,20 @@ const server=createServer(async(req,res)=>{
       return normalizeJamendo(JSON.parse(body));
     };
     const searchOpenverse=async()=>{
-      const api=new URL('https://api.openverse.org/v1/audio/');
-      for(const [k,v] of [['q',q],['page_size','20'],['license_type','commercial,modification'],['filter_dead','true']]) api.searchParams.set(k,v);
-      const r=await fetch(api,{headers:{'User-Agent':'Festival-of-Bharat-Reel-Maker/1.0'}});
-      const body=await r.text();
-      if(!r.ok) throw Error('Openverse HTTP '+r.status+': '+body.slice(0,250));
-      const data=JSON.parse(body);
-      return (data.results||[]).filter(x=>x?.url).map(x=>({
+      const queries=[q, q+' devotional', q+' festival', q+' india'];
+      const all=[];
+      for(const term of queries){
+        const api=new URL('https://api.openverse.org/v1/audio/');
+        for(const [k,v] of [['q',term],['page_size','20'],['license_type','commercial,modification'],['filter_dead','true']]) api.searchParams.set(k,v);
+        const rr=await fetch(api,{headers:{'User-Agent':'Festival-of-Bharat-Reel-Maker/1.0'}});
+        const body=await rr.text();
+        if(!rr.ok) continue;
+        const data=JSON.parse(body);
+        for(const x of (data.results||[])){
+          if(x?.url && !all.some(y=>y.id===x.id)) all.push(x);
+        }
+      }
+      return all.slice(0,40).map(x=>({
         id:'openverse-'+x.id,name:x.title||'Untitled audio',
         artist_name:x.creator||'Unknown creator',duration:Math.round((+x.duration||0)/1000)||0,
         audio:'/proxy?url='+encodeURIComponent(x.url),original_audio:x.url,
