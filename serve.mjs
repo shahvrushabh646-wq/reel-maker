@@ -34,7 +34,7 @@ const server=createServer(async(req,res)=>{
       const client=process.env.JAMENDO_CLIENT_ID;
       if(!client) return [];
       const api=new URL('https://api.jamendo.com/v3.0/tracks/');
-      for(const [k,v] of [['client_id',client],['format','json'],['limit','30'],['search',q],['order','relevance'],['audioformat','mp32'],['include','licenses musicinfo'],['type','single albumtrack']]) api.searchParams.set(k,v);
+      for(const [k,v] of [['client_id',client],['format','json'],['limit','100'],['search',q],['order','relevance'],['audioformat','mp32'],['include','licenses musicinfo'],['type','single albumtrack']]) api.searchParams.set(k,v);
       // Ask Jamendo for commercial tracks when the account supports Pro licensing.
       api.searchParams.set('prolicensing','true');
       const r=await fetch(api,{headers:{'User-Agent':'Festival-of-Bharat-Reel-Maker/1.0'}});
@@ -73,14 +73,19 @@ const server=createServer(async(req,res)=>{
       }));
     };
     try{
-      let results=[];
-      let source='Openverse';
+      const merged=[];
+      const seen=new Set();
+      const addMany=(items,src)=>{for(const x of (items||[])){if(x?.audio&&!seen.has(x.id)){seen.add(x.id);merged.push(x)}}};
+      let jamendo=[];
       if(process.env.JAMENDO_CLIENT_ID){
-        try{results=await searchJamendo();source='Jamendo';}catch(e){console.warn('Jamendo music search failed, using Openverse:',e.message)}
+        try{jamendo=await searchJamendo();}catch(e){console.warn('Jamendo music search failed:',e.message)}
       }
-      if(!results.length) results=await searchOpenverse();
-      if(!results.length) return send(res,200,{'Content-Type':'application/json','Cache-Control':'no-store'},JSON.stringify({results:[],source,message:'No openly licensed tracks matched this search.'}));
-      return send(res,200,{'Content-Type':'application/json','Cache-Control':'no-store'},JSON.stringify({results,source}));
+      let openverse=[];
+      try{openverse=await searchOpenverse();}catch(e){console.warn('Openverse music search failed:',e.message)}
+      addMany(jamendo,'Jamendo');
+      addMany(openverse,'Openverse');
+      if(!merged.length) return send(res,200,{'Content-Type':'application/json','Cache-Control':'no-store'},JSON.stringify({results:[],source:'Multiple catalogs',message:'No playable licensed tracks matched this search.'}));
+      return send(res,200,{'Content-Type':'application/json','Cache-Control':'no-store'},JSON.stringify({results:merged.slice(0,160),source:'Jamendo + Openverse',counts:{jamendo:jamendo.length,openverse:openverse.length}}));
     }catch(e){
       return send(res,502,{'Content-Type':'application/json'},JSON.stringify({error:'Music catalog unavailable: '+e.message}));
     }
