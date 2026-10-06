@@ -334,7 +334,9 @@ $('fontUpload').onchange=async e=>{
  const o=document.createElement('option');o.textContent=f.name;o.value=name;$('fontFamily').appendChild(o);$('fontFamily').value=name;$('fontPreview').style.fontFamily='"'+name+'",sans-serif';draw(0);
  }catch(err){alert('Could not load this font. Please use a valid TTF, OTF, WOFF or WOFF2 file.')}
 };
-</scriptfunction templateIcon(t,i){const p=['linear-gradient(145deg,#111827,#4b5563)','linear-gradient(145deg,#171717,#9a7b45)','linear-gradient(145deg,#3b0a0a,#f59e0b)','linear-gradient(145deg,#0f172a,#6d28d9)','linear-gradient(145deg,#172554,#0f766e)','linear-gradient(145deg,#020617,#e11d48)','linear-gradient(145deg,#1c1917,#78716c)','linear-gradient(145deg,#172554,#38bdf8)'];return p[i%p.length]}
+</script>
+<script>
+function templateIcon(t,i){const p=['linear-gradient(145deg,#111827,#4b5563)','linear-gradient(145deg,#171717,#9a7b45)','linear-gradient(145deg,#3b0a0a,#f59e0b)','linear-gradient(145deg,#0f172a,#6d28d9)','linear-gradient(145deg,#172554,#0f766e)','linear-gradient(145deg,#020617,#e11d48)','linear-gradient(145deg,#1c1917,#78716c)','linear-gradient(145deg,#172554,#38bdf8)'];return p[i%p.length]}
 function templateDemoMedia(i){
  const imgs=results.filter(x=>x.kind==='image'), vids=results.filter(x=>x.kind==='video');
  const im=imgs.length?imgs[i%imgs.length]:null, vd=vids.length?vids[i%vids.length]:null;
