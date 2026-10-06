@@ -19,18 +19,54 @@ const server=createServer(async(req,res)=>{
     catch(e){ return send(res,500,{'Content-Type':'text/plain'},'Could not read index.html'); }
   }
   if(u.pathname==='/music-search'){
-    const client=process.env.JAMENDO_CLIENT_ID||'709fa152', q=u.searchParams.get('q')||'';
-    // Jamendo documents 709fa152 as a read-API testing client. Prefer a real app client in production via JAMENDO_CLIENT_ID.
+    const q=u.searchParams.get('q')||'';
     if(!q.trim()) return send(res,400,{'Content-Type':'application/json'},JSON.stringify({error:'Missing query'}));
-    try{
+    const normalizeJamendo=(data)=>{
+      if(data?.headers?.status!=='success') throw Error(data?.headers?.error_message||'Jamendo API returned an error');
+      return (data.results||[]).filter(x=>x?.audio).map(x=>({
+        id:'jamendo-'+x.id,name:x.name,artist_name:x.artist_name||'Unknown artist',
+        duration:+x.duration||0,audio:x.audio,license:x.license_ccurl||'Jamendo Pro',
+        license_ccurl:x.license_ccurl||'',audiodownload_allowed:!!x.audiodownload_allowed,
+        source:'Jamendo',landing:x.shareurl||''
+      }));
+    };
+    const searchJamendo=async()=>{
+      const client=process.env.JAMENDO_CLIENT_ID;
+      if(!client) return [];
       const api=new URL('https://api.jamendo.com/v3.0/tracks/');
       for(const [k,v] of [['client_id',client],['format','json'],['limit','20'],['search',q],['order','relevance'],['audioformat','mp32'],['include','musicinfo'],['prolicensing','true'],['type','single albumtrack']]) api.searchParams.set(k,v);
-      const r=await fetch(api,{headers:{'User-Agent':'Festival-of-Bharat-Reel-Maker/1.0'}}); const body=await r.text();
-      if(!r.ok) throw Error('Jamendo HTTP '+r.status+': '+body.slice(0,400));
-      let data; try{data=JSON.parse(body)}catch{throw Error('Jamendo returned non-JSON response: '+body.slice(0,300))}
-      if(data?.headers?.status==='success') return send(res,200,{'Content-Type':'application/json','Cache-Control':'no-store'},JSON.stringify(data));
-      throw Error(data?.headers?.error_message||'Jamendo API returned an error');
-    }catch(e){return send(res,502,{'Content-Type':'application/json'},JSON.stringify({error:e.message}));}
+      const r=await fetch(api,{headers:{'User-Agent':'Festival-of-Bharat-Reel-Maker/1.0'}});
+      const body=await r.text();
+      if(!r.ok) throw Error('Jamendo HTTP '+r.status);
+      return normalizeJamendo(JSON.parse(body));
+    };
+    const searchOpenverse=async()=>{
+      const api=new URL('https://api.openverse.org/v1/audio/');
+      for(const [k,v] of [['q',q],['page_size','20'],['license_type','commercial,modification'],['filter_dead','true']]) api.searchParams.set(k,v);
+      const r=await fetch(api,{headers:{'User-Agent':'Festival-of-Bharat-Reel-Maker/1.0'}});
+      const body=await r.text();
+      if(!r.ok) throw Error('Openverse HTTP '+r.status+': '+body.slice(0,250));
+      const data=JSON.parse(body);
+      return (data.results||[]).filter(x=>x?.url).map(x=>({
+        id:'openverse-'+x.id,name:x.title||'Untitled audio',
+        artist_name:x.creator||'Unknown creator',duration:Math.round((+x.duration||0)/1000)||0,
+        audio:'/proxy?url='+encodeURIComponent(x.url),original_audio:x.url,
+        license:x.license||'',license_ccurl:x.license_url||'',
+        audiodownload_allowed:true,source:'Openverse',landing:x.foreign_landing_url||x.detail_url||''
+      }));
+    };
+    try{
+      let results=[];
+      let source='Openverse';
+      if(process.env.JAMENDO_CLIENT_ID){
+        try{results=await searchJamendo();source='Jamendo';}catch(e){console.warn('Jamendo music search failed, using Openverse:',e.message)}
+      }
+      if(!results.length) results=await searchOpenverse();
+      if(!results.length) return send(res,200,{'Content-Type':'application/json','Cache-Control':'no-store'},JSON.stringify({results:[],source,message:'No openly licensed tracks matched this search.'}));
+      return send(res,200,{'Content-Type':'application/json','Cache-Control':'no-store'},JSON.stringify({results,source}));
+    }catch(e){
+      return send(res,502,{'Content-Type':'application/json'},JSON.stringify({error:'Music catalog unavailable: '+e.message}));
+    }
   }
   if(u.pathname==='/google-images'){
     const key=process.env.GOOGLE_CSE_KEY||'',cx=process.env.GOOGLE_CSE_ID||'',q=u.searchParams.get('q')||'';
