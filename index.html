@@ -169,7 +169,8 @@ function templateDemoMedia(i){
  const imgs=results.filter(x=>x.kind==='image'), vids=results.filter(x=>x.kind==='video');
  const im=imgs.length?imgs[i%imgs.length]:null, vd=vids.length?vids[i%vids.length]:null;
  const photo=im?.thumbPlay||im?.url||'';
- const video=vd?.playUrl||vd?.url||BUILTIN_TEMPLATE_VIDEOS[i%BUILTIN_TEMPLATE_VIDEOS.length];
+ const rawVideo=vd?.playUrl||vd?.url||BUILTIN_TEMPLATE_VIDEOS[i%BUILTIN_TEMPLATE_VIDEOS.length];
+ const video=rawVideo?proxy(rawVideo):'';
  return {photo,video};
 }
 function playTemplateVideos(root=document){
@@ -195,8 +196,8 @@ function renderTemplates(){
  list.innerHTML=filtered.map(({t,i})=>{
    const m=templateDemoMedia(i);
    let visual;
-   if(m.video) visual='<video class="templateDemoMedia" muted playsinline autoplay loop preload="metadata" src="'+esc(m.video)+'"></video>';
-   else if(m.photo) visual='<img class="templateDemoMedia" src="'+esc(m.photo)+'" alt="'+esc(t.name)+'">';
+   if(m.video) visual='<video class="templateDemoMedia" muted playsinline autoplay loop controls="false" preload="auto" src="'+esc(m.video)+'"></video>';
+   else visual='<div class="templateDemoFallback"><span>Video preview unavailable</span></div>';
    else visual='<div class="templateDemoFallback"><span>'+esc(t.name)+'</span></div>';
    return '<article class="templateCard '+(activeTemplate===t?'chosen':'')+'" onclick="runTemplate('+i+');event.stopPropagation()">'+
     '<div class="templateLive">'+visual+'<div class="templatePlay">▶</div><span class="templateLiveBadge">▶ PREVIEW · '+esc(t.speed)+'</span><div class="templateDemoOverlay"><b>'+esc(t.name)+'</b><span>'+esc(t.dur)+'s · '+esc(t.cat)+' · works with photo, video or mixed media</span></div></div>'+
