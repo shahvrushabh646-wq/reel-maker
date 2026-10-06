@@ -169,8 +169,12 @@ function templateDemoMedia(i){
  const imgs=results.filter(x=>x.kind==='image'), vids=results.filter(x=>x.kind==='video');
  const im=imgs.length?imgs[i%imgs.length]:null, vd=vids.length?vids[i%vids.length]:null;
  const photo=im?.thumbPlay||im?.url||'';
- const rawVideo=vd?.playUrl||vd?.url||BUILTIN_TEMPLATE_VIDEOS[i%BUILTIN_TEMPLATE_VIDEOS.length];
- const video=rawVideo?proxy(rawVideo):'';
+ // A media-search result may already contain a same-origin /proxy URL.
+ // Never proxy that URL a second time; double-proxying was breaking template videos.
+ let video='';
+ if(vd?.playUrl) video=vd.playUrl;
+ else if(vd?.url) video=proxy(vd.url);
+ else video=proxy(BUILTIN_TEMPLATE_VIDEOS[i%BUILTIN_TEMPLATE_VIDEOS.length]);
  return {photo,video};
 }
 function playTemplateVideos(root=document){
@@ -196,8 +200,8 @@ function renderTemplates(){
  list.innerHTML=filtered.map(({t,i})=>{
    const m=templateDemoMedia(i);
    let visual;
-   if(m.video) visual='<video class="templateDemoMedia" muted playsinline autoplay loop controls="false" preload="auto" src="'+esc(m.video)+'"></video>';
-   else visual='<div class="templateDemoFallback"><span>Video preview unavailable</span></div>';
+   if(m.video) visual='<video class="templateDemoMedia" muted playsinline autoplay loop preload="metadata" src="'+esc(m.video)+'"></video>';
+   else visual='<div class="templateDemoFallback"><span>Loading real preview…</span></div>';
    return '<article class="templateCard '+(activeTemplate===t?'chosen':'')+'" onclick="runTemplate('+i+');event.stopPropagation()">'+
     '<div class="templateLive">'+visual+'<div class="templatePlay">▶</div><span class="templateLiveBadge">▶ PREVIEW · '+esc(t.speed)+'</span><div class="templateDemoOverlay"><b>'+esc(t.name)+'</b><span>'+esc(t.dur)+'s · '+esc(t.cat)+' · works with photo, video or mixed media</span></div></div>'+
     '<div class="templateCardBody"><div><b>'+esc(t.name)+'</b><span>'+esc(t.desc)+'</span></div><button type="button" class="primary" onclick="runTemplate('+i+');event.stopPropagation()">Use template</button></div></article>';
@@ -405,9 +409,13 @@ $('export').onclick=async()=>{
  if(!selected.length)autoSelect();
  if(!selected.length){$('qc').textContent='QC: Add or import media first';return}
  if(!sequence.length)sequence=buildSequence();
+ if(!sequence.length){$('qc').textContent='QC: No usable scenes found';return}
+ renderToken++;
  openWorkspace('preview');
  await new Promise(requestAnimationFrame);
+ await draw(0,true);
  const c=$('canvas'),stream=c.captureStream(30);
+ if(!stream.getVideoTracks().length){$('qc').textContent='QC: Browser did not provide a canvas video track';return}
  let exportAudio=null;
  try{
    const musicSrc=selectedMusic?.audio||null;
@@ -423,8 +431,15 @@ $('export').onclick=async()=>{
      exportAudio=audioObj;
    }
  }catch(e){console.warn('Audio export unavailable',e);$('qc').textContent='QC: Video recording; audio could not be attached in this browser'}
- const mime=MediaRecorder.isTypeSupported('video/webm;codecs=vp9,opus')?'video/webm;codecs=vp9,opus':(MediaRecorder.isTypeSupported('video/webm;codecs=vp9')?'video/webm;codecs=vp9':'video/webm');
- let rec;try{rec=new MediaRecorder(stream,{mimeType:mime,videoBitsPerSecond:8000000})}catch(e){$('qc').textContent='QC: Browser cannot record this reel';return}
+ const mimeCandidates=['video/webm;codecs=vp8,opus','video/webm;codecs=vp9,opus','video/webm;codecs=vp8','video/webm'];
+ const mime=mimeCandidates.find(x=>MediaRecorder.isTypeSupported(x))||'video/webm';
+ let rec;try{
+   rec=new MediaRecorder(stream,{mimeType:mime,videoBitsPerSecond:8000000});
+ }catch(e){
+   $('qc').textContent='QC: Browser cannot record this reel: '+String(e.message||e);
+   stream.getTracks().forEach(t=>t.stop());
+   return;
+ }
  const chunks=[];
  rec.ondataavailable=e=>{if(e.data.size)chunks.push(e.data)};
  rec.onstop=async()=>{
@@ -451,8 +466,7 @@ $('export').onclick=async()=>{
    exportAudio.ontimeupdate=()=>{const end=+$('musicEnd').value||0;if(end>0&&exportAudio.currentTime>=end){exportAudio.pause();exportAudio.ontimeupdate=null}};
    try{await exportAudio.play()}catch{}
  }
- // Draw the first deterministic frame before recording so the stream never starts blank.
- await draw(0,true);
+ // First frame is rendered before captureStream recording begins.
  rec.start(200);
  $('qc').textContent='QC: Creating reel… 0%';
  const duration=Math.max(1,+$('duration').value||15),startedAt=performance.now();
