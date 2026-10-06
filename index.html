@@ -348,56 +348,7 @@ function renderTemplates(){
  const cats=['All','Slow','Fast','Mixed'];
  $('templateTabs').innerHTML=cats.map(x=>{
    const count=x==='All'?150:50;
-   return '<button class="tab '+(templateCat===x?'active':'')+'" onclick="setTemplateCat(\\''+esc(x)+'\\')">'+esc(x)+' <span style="opacity:.65">('+count+')</span></button>';
- }).join('');
- const q=templateSearch.toLowerCase();
- const list=templates.filter(t=>(templateCat==='All'||t.cat===templateCat)&&(!q||t.name.toLowerCase().includes(q)||t.desc.toLowerCase().includes(q)));
- $('templateCount').textContent=list.length+' templates · '+(templateCat==='All'?'50 Slow · 50 Fast · 50 Mixed':templateCat+' 50');
- $('templateList').innerHTML=list.map((t,li)=>{
-   const i=templates.indexOf(t),active=activeTemplate===t, demo=templateDemoMedia(i);
-   const photoStyle=demo.photo?'background-image:url("'+String(demo.photo).replace(/"/g,'&quot;')+'")':'';
-   const videoStyle=demo.video?'background-image:url("'+String(demo.video).replace(/"/g,'&quot;')+'")':'';
-   const mode=t.cat.toLowerCase();
-   return '<article class="templateCard liveTemplate '+(active?'chosen':'')+'" data-speed="'+mode+'" onclick="previewTemplate('+i+')">'+
-    '<div class="liveDemo '+mode+'">'+
-      '<div class="demoShot demoPhoto" style="'+photoStyle+'"><span>PHOTO</span></div>'+
-      '<div class="demoShot demoVideo" style="'+videoStyle+'"><span>VIDEO</span></div>'+
-      '<div class="demoText"><small>'+esc(t.cat)+'</small><b>'+esc(t.name.split(' · ')[0])+'</b><i>▶ LIVE DEMO</i></div>'+
-      '<div class="demoProgress"><i></i></div>'+
-    '</div>'+
-    '<div class="templateCardBody"><div><b>'+esc(t.name)+'</b><span>'+t.cat+' · '+t.dur+'s · 50/50 media demo</span></div><button class="'+(active?'primary':'secondary')+'" onclick="event.stopPropagation();pickTemplate('+i+')">'+(active?'✓ Applied':'Use template')+'</button></div>'+
-    '<p>'+esc(t.desc)+'</p>'+
-   '</article>';
- }).join('')||'<div class="notice">No templates match your search.</div>';
-}
-window.setTemplateCat=c=>{templateCat=c;renderTemplates()};
-window.clearTemplateSearch=()=>{$('templateSearch').value='';templateSearch='';renderTemplates()};
-window.previewTemplate=i=>{
- const t=templates[i]; const demo=templateDemoMedia(i);
- let modal=$('templatePreviewModal');
- if(!modal){modal=document.createElement('div');modal.id='templatePreviewModal';modal.className='templateModal';document.body.appendChild(modal)}
- modal.innerHTML='<div class="templateModalInner"><button class="templateModalClose" onclick="document.getElementById(\'templatePreviewModal\').remove()">×</button><div class="modalLive '+t.cat.toLowerCase()+'"><div class="demoShot demoPhoto" style="'+(demo.photo?'background-image:url("'+String(demo.photo).replace(/"/g,'&quot;')+'")':'')+'"><span>PHOTO</span></div><div class="demoShot demoVideo" style="'+(demo.video?'background-image:url("'+String(demo.video).replace(/"/g,'&quot;')+'")':'')+'"><span>VIDEO</span></div><div class="demoText"><small>'+esc(t.cat)+' TEMPLATE</small><b>'+esc(t.name)+'</b><i>▶ PLAYING PREVIEW</i></div></div><div class="row modalActions"><div><b>'+esc(t.name)+'</b><div class="muted">'+t.cat+' · '+t.dur+'s · Photos + Videos</div></div><button class="primary" onclick="pickTemplate('+i+');document.getElementById(\'templatePreviewModal\').remove()">Use this template</button></div></div>';
- document.body.appendChild(modal);
-};
-window.pickTemplate=pickTemplate;
-renderTemplates();
-function buildSequence(){
- const imgs=selected.filter(x=>x.kind==='image'), vids=selected.filter(x=>x.kind==='video');
- if(!selected.length)return [];
- const videoPct=Math.max(0,Math.min(100,+$('mix').value||0));
- let vi=0,ii=0;
- return activeTemplate.scenes.map((sc,n)=>{
-   const role=sc[0];
-   let useVideo;
-   if(!imgs.length) useVideo=true;
-   else if(!vids.length) useVideo=false;
-   else if(role==='FAST'||role==='PEAK') useVideo=true;
-   else if(role==='DETAIL') useVideo=false;
-   else useVideo=((n*100/activeTemplate.scenes.length)<videoPct);
-   let pool=useVideo?vids:imgs;
-   if(!pool.length)pool=useVideo?imgs:vids;
-   const x=pool[(useVideo?vi++:ii++)%pool.length];
-   return {media:x,role,label:sc[1],n};
+   return '<button class="tab '+(templateCat===x?'active':'')+'" onclick="setTemplateCat(&quot;'+x+'&quot;)">'+esc(x)+' <span style="opacity:.65">('+count+')</span></button>';
  });
 }
 function pickTemplate(i){
