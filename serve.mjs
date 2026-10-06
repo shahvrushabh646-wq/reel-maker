@@ -73,19 +73,44 @@ const server=createServer(async(req,res)=>{
       }));
     };
     try{
-      const merged=[];
+      const searchYouTube=async()=>{
+      const key=process.env.YOUTUBE_API_KEY;
+      if(!key) return [];
+      const api=new URL('https://www.googleapis.com/youtube/v3/search');
+      for(const [k,v] of [['part','snippet'],['q',q],['type','video'],['maxResults','25'],['videoCategoryId','10'],['regionCode','IN'],['key',key]]) api.searchParams.set(k,v);
+      const r=await fetch(api); const d=await r.json();
+      if(!r.ok) throw Error(d?.error?.message||'YouTube API error');
+      return (d.items||[]).map(x=>({id:'youtube-'+x.id.videoId,name:x.snippet?.title||'YouTube Music',artist_name:x.snippet?.channelTitle||'YouTube',duration:0,audio:null,source:'YouTube',landing:'https://www.youtube.com/watch?v='+x.id.videoId,thumbnail:x.snippet?.thumbnails?.high?.url||x.snippet?.thumbnails?.medium?.url||''}));
+    };
+    const searchSpotify=async()=>{
+      const id=process.env.SPOTIFY_CLIENT_ID, secret=process.env.SPOTIFY_CLIENT_SECRET;
+      if(!id||!secret) return [];
+      const token=Buffer.from(id+':'+secret).toString('base64');
+      const tr=await fetch('https://accounts.spotify.com/api/token',{method:'POST',headers:{Authorization:'Basic '+token,'Content-Type':'application/x-www-form-urlencoded'},body:'grant_type=client_credentials'});
+      const td=await tr.json(); if(!tr.ok||!td.access_token) throw Error(td?.error_description||'Spotify auth failed');
+      const api=new URL('https://api.spotify.com/v1/search');
+      for(const [k,v] of [['q',q],['type','track'],['limit','25'],['market','IN']]) api.searchParams.set(k,v);
+      const r=await fetch(api,{headers:{Authorization:'Bearer '+td.access_token}});
+      const d=await r.json(); if(!r.ok) throw Error(d?.error?.message||'Spotify API error');
+      return (d.tracks?.items||[]).map(x=>({id:'spotify-'+x.id,name:x.name,artist_name:(x.artists||[]).map(a=>a.name).join(', '),duration:Math.round((x.duration_ms||0)/1000),audio:x.preview_url||null,source:'Spotify',landing:x.external_urls?.spotify||('https://open.spotify.com/track/'+x.id),thumbnail:x.album?.images?.[0]?.url||''}));
+    };
+    const merged=[];
       const seen=new Set();
       const addMany=(items,src)=>{for(const x of (items||[])){if(x?.audio&&!seen.has(x.id)){seen.add(x.id);merged.push(x)}}};
       let jamendo=[];
       if(process.env.JAMENDO_CLIENT_ID){
         try{jamendo=await searchJamendo();}catch(e){console.warn('Jamendo music search failed:',e.message)}
       }
-      let openverse=[];
+      let openverse=[], youtube=[], spotify=[];
       try{openverse=await searchOpenverse();}catch(e){console.warn('Openverse music search failed:',e.message)}
+      try{youtube=await searchYouTube();}catch(e){console.warn('YouTube music search failed:',e.message)}
+      try{spotify=await searchSpotify();}catch(e){console.warn('Spotify music search failed:',e.message)}
       addMany(jamendo,'Jamendo');
       addMany(openverse,'Openverse');
+      addMany(youtube,'YouTube');
+      addMany(spotify,'Spotify');
       if(!merged.length) return send(res,200,{'Content-Type':'application/json','Cache-Control':'no-store'},JSON.stringify({results:[],source:'Multiple catalogs',message:'No playable licensed tracks matched this search.'}));
-      return send(res,200,{'Content-Type':'application/json','Cache-Control':'no-store'},JSON.stringify({results:merged.slice(0,160),source:'Jamendo + Openverse',counts:{jamendo:jamendo.length,openverse:openverse.length}}));
+      return send(res,200,{'Content-Type':'application/json','Cache-Control':'no-store'},JSON.stringify({results:merged.slice(0,160),source:'Jamendo + Openverse',counts:{jamendo:jamendo.length,openverse:openverse.length,youtube:youtube.length,spotify:spotify.length}}));
     }catch(e){
       return send(res,502,{'Content-Type':'application/json'},JSON.stringify({error:'Music catalog unavailable: '+e.message}));
     }
