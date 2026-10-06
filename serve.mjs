@@ -18,6 +18,18 @@ const server=createServer(async(req,res)=>{
     try { const html=await readFile(resolve(root,'index.html'),'utf8'); return send(res,200,{'Content-Type':'text/html; charset=utf-8','Cache-Control':'no-store'},html); }
     catch(e){ return send(res,500,{'Content-Type':'text/plain'},'Could not read index.html'); }
   }
+  if(u.pathname==='/music-search'){
+    const client=process.env.JAMENDO_CLIENT_ID||'', q=u.searchParams.get('q')||'';
+    if(!client) return send(res,503,{'Content-Type':'application/json'},JSON.stringify({error:'Licensed music search is not configured. Add JAMENDO_CLIENT_ID in Render environment variables.'}));
+    if(!q.trim()) return send(res,400,{'Content-Type':'application/json'},JSON.stringify({error:'Missing query'}));
+    try{
+      const api=new URL('https://api.jamendo.com/v3.0/tracks/');
+      for(const [k,v] of [['client_id',client],['format','json'],['limit','20'],['search',q],['order','relevance'],['audioformat','mp32'],['include','musicinfo'],['prolicensing','true'],['type','single albumtrack']]) api.searchParams.set(k,v);
+      const r=await fetch(api); const body=await r.text();
+      if(!r.ok) throw Error(body.slice(0,400));
+      return send(res,200,{'Content-Type':'application/json','Cache-Control':'no-store'},body);
+    }catch(e){return send(res,502,{'Content-Type':'application/json'},JSON.stringify({error:e.message}));}
+  }
   if(u.pathname==='/google-images'){
     const key=process.env.GOOGLE_CSE_KEY||'',cx=process.env.GOOGLE_CSE_ID||'',q=u.searchParams.get('q')||'';
     if(!key||!cx) return send(res,503,{'Content-Type':'application/json'},JSON.stringify({error:'Google image search is not configured'}));
