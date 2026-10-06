@@ -91,8 +91,6 @@ function pickTemplate(i){
 }
 window.setCat=c=>{templateCat=c;renderTemplates()};window.pickTemplate=pickTemplate;
 renderTemplates();pickTemplate(0);
-update()};
-renderTemplates();
 $('duration').oninput=e=>{$('durVal').textContent=e.target.value+'s';sequence=buildSequence();renderToken++;draw(0)};$('mix').oninput=()=>{update();sequence=buildSequence();renderToken++;draw(0)};
 $('selectAll').onclick=()=>{results.forEach(x=>{if(!selected.some(a=>a.id===x.id))selected.push(x)});render();draw(0)};
 $('clear').onclick=()=>{selected.length=0;render();draw(0)};
