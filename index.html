@@ -8,24 +8,54 @@ body{margin:0;background:#111;color:#f5eee4;font:15px Arial,sans-serif}main{max-
 <p class="muted">Standalone production workspace · search, select, preview and build a 9:16 reel.</p>
 <form id="form" class="search"><input id="q" required placeholder="Search Navratri, Mahadev, Ganpati, temple…"><button>Search</button></form>
 <div class="row"><button onclick="document.getElementById('files').click();return false">Import photos/videos</button><input id="files" type="file" accept="image/*,video/*" multiple hidden><select id="style"><option>Cinematic</option><option>Devotional</option><option>Festival</option><option>Energetic</option><option>Storytelling</option></select><button id="selectAll">Select all visible</button><button id="clear">Clear selected</button></div>
-<div id="status" class="muted">Search results will appear here.</div><div id="grid" class="grid"></div>
+<div class="row"><span class="pill" id="photoCount">Photos: 0</span><span class="pill" id="videoCount">Videos: 0</span><span class="pill">Target: 100+ photos + 100+ videos</span></div><div id="status" class="muted">Search results will appear here.</div><div id="grid" class="grid"></div>
 <hr style="border-color:#333;margin:28px 0"><div class="stage"><div class="phone"><canvas id="canvas" width="540" height="960"></canvas></div><div style="min-width:300px;flex:1"><h2>Reel Preview</h2><p id="selectedCount">0 selected</p><input id="audio" type="file" accept="audio/*"><div class="row"><button id="build">Build preview</button><button id="play">Play</button><button id="export">Export WebM</button></div><p class="muted">Target: 1080×1920 · 9:16 · 30 FPS. Final MP4/H.264 conversion can be added through the browser FFmpeg workflow.</p></div></div>
 </main>
 <script>
-const selected=[];let results=[];let audio=null,playing=false,raf=0;const $=id=>document.getElementById(id);
+const selected=[];let results=[];let playing=false,raf=0,activeVideo=null;
+const $=id=>document.getElementById(id);
 function esc(s){return String(s||'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]))}
-function render(){const g=$('grid');g.innerHTML=results.map((x,i)=>'<div class="card"><img src="'+esc(x.thumb||x.url)+'" loading="lazy"><b>'+esc(x.title||'Untitled')+'</b><div class="muted">'+esc(x.source||'')+'</div><button onclick="toggle('+i+')">'+(selected.some(a=>a.id===x.id)?'✓ Selected':'Select ✓')+'</button></div>').join('');$('selectedCount').textContent=selected.length+' selected';}
+function updateCounts(){const p=results.filter(x=>x.kind==='image').length,v=results.filter(x=>x.kind==='video').length;$('photoCount').textContent='Photos: '+p;$('videoCount').textContent='Videos: '+v;$('selectedCount').textContent=selected.length+' selected'}
+function render(){const g=$('grid');g.innerHTML=results.map((x,i)=>'<div class="card">'+(x.kind==='video'?'<video src="'+esc(x.url)+'" poster="'+esc(x.thumb||'')+'" muted preload="metadata" controls></video>':'<img src="'+esc(x.thumb||x.url)+'" loading="lazy">')+'<b>'+esc(x.title||'Untitled')+'</b><div class="muted">'+esc(x.source||'')+'</div><button onclick="toggle('+i+')">'+(selected.some(a=>a.id===x.id)?'✓ Selected':'Select ✓')+'</button></div>').join('');updateCounts()}
 window.toggle=i=>{const x=results[i],p=selected.findIndex(a=>a.id===x.id);p>=0?selected.splice(p,1):selected.push(x);render()};
 $('clear').onclick=()=>{selected.length=0;render()};$('selectAll').onclick=()=>{results.forEach(x=>{if(!selected.some(a=>a.id===x.id))selected.push(x)});render()};
 $('files').onchange=e=>{[...e.target.files].forEach(f=>{const u=URL.createObjectURL(f);results.unshift({id:'local-'+crypto.randomUUID(),title:f.name,source:'Local file',url:u,thumb:u,kind:f.type.startsWith('video')?'video':'image'})});render()};
-async function search(q){$('status').textContent='Searching Openverse and Wikimedia Commons…';results=[];render();const out=[];
-try{const r=await fetch('https://api.openverse.org/v1/images/?q='+encodeURIComponent(q)+'&page_size=40&license_type=commercial,modification');const j=await r.json();(j.results||[]).forEach(x=>out.push({id:'ov-'+x.id,title:x.title,source:'Openverse',url:x.url,thumb:x.thumbnail||x.url,kind:x.filetype==='video'?'video':'image'}))}catch(e){}
-try{const r=await fetch('https://commons.wikimedia.org/w/api.php?action=query&generator=search&gsrsearch='+encodeURIComponent(q)+'&gsrnamespace=6&gsrlimit=40&prop=imageinfo&iiprop=url|mime&iiurlwidth=700&format=json&origin=*');const j=await r.json();Object.values(j.query?.pages||{}).forEach(x=>{const ii=x.imageinfo?.[0];if(ii?.url)out.push({id:'wm-'+x.pageid,title:x.title,source:'Wikimedia Commons',url:ii.url,thumb:ii.thumburl||ii.url,kind:(ii.mime||'').startsWith('video')?'video':'image'})})}catch(e){}
-results=out; $('status').textContent=results.length+' results found. Verify each licence before publishing.';render()}
+async function getJSON(url){try{const r=await fetch(url);if(!r.ok)throw Error(r.status);return await r.json()}catch(e){return null}}
+async function search(q){
+ $('status').textContent='Searching licensed media…';results=[];render();
+ const out=[],seen=new Set();
+ const add=x=>{if(x.url&&!seen.has(x.url)){seen.add(x.url);out.push(x)}};
+ const queries=[q,q+' temple',q+' festival',q+' deity',q+' aerial',q+' cinematic',q+' detail'];
+ for(const term of queries.slice(0,4)){
+   const j=await getJSON('https://api.openverse.org/v1/images/?q='+encodeURIComponent(term)+'&page_size=100&license_type=commercial,modification&size=large');
+   (j?.results||[]).forEach(x=>add({id:'ov-'+x.id,title:x.title,source:'Openverse',url:x.url,thumb:x.thumbnail||x.url,kind:'image',license:x.license,license_url:x.license_url}));
+ }
+ const wm=await getJSON('https://commons.wikimedia.org/w/api.php?action=query&generator=search&gsrsearch='+encodeURIComponent(q)+'&gsrnamespace=6&gsrlimit=100&prop=imageinfo&iiprop=url|mime|size&iiurlwidth=700&format=json&origin=*');
+ Object.values(wm?.query?.pages||{}).forEach(x=>{const ii=x.imageinfo?.[0];if(ii?.url&&!/^video\//.test(ii.mime||''))add({id:'wm-'+x.pageid,title:x.title,source:'Wikimedia Commons',url:ii.url,thumb:ii.thumburl||ii.url,kind:'image'})});
+ const wv=await getJSON('https://commons.wikimedia.org/w/api.php?action=query&generator=search&gsrsearch='+encodeURIComponent(q+' filetype:video')+'&gsrnamespace=6&gsrlimit=100&prop=imageinfo&iiprop=url|mime|size&iiurlwidth=700&format=json&origin=*');
+ Object.values(wv?.query?.pages||{}).forEach(x=>{const ii=x.imageinfo?.[0];if(ii?.url&&(ii.mime||'').startsWith('video/'))add({id:'wv-'+x.pageid,title:x.title,source:'Wikimedia Commons',url:ii.url,thumb:ii.thumburl||'',kind:'video'})});
+ results=out;
+ const images=results.filter(x=>x.kind==='image').slice(0,100),videos=results.filter(x=>x.kind==='video').slice(0,100);
+ results=[...images,...videos];
+ $('status').textContent='Found '+images.length+' photos + '+videos.length+' videos. Select media for the reel.';
+ render();
+}
 $('form').onsubmit=e=>{e.preventDefault();search($('q').value.trim())};
-$('audio').onchange=e=>{if(e.target.files[0])audio=new Audio(URL.createObjectURL(e.target.files[0]))};
-function draw(t=0){const c=$('canvas'),x=c.getContext('2d');x.fillStyle='#111';x.fillRect(0,0,c.width,c.height);if(!selected.length){x.fillStyle='#aaa';x.font='24px Arial';x.fillText('Select media to preview',70,480);return}const a=selected[Math.floor(t/2)%selected.length];const im=new Image();im.onload=()=>{const s=Math.max(c.width/im.width,c.height/im.height),w=im.width*s,h=im.height*s,zoom=1+0.04*(t%2);x.save();x.translate(c.width/2,c.height/2);x.scale(zoom,zoom);x.drawImage(im,-w/2,-h/2,w,h);x.restore()};im.src=a.thumb||a.url}
-$('build').onclick=()=>draw(0);$('play').onclick=()=>{playing=!playing;if(playing){const st=performance.now();const tick=n=>{if(!playing)return;draw((n-st)/1000);raf=requestAnimationFrame(tick)};raf=requestAnimationFrame(tick)}};
-$('export').onclick=async()=>{const c=$('canvas');if(!selected.length)return alert('Select media first');if(!window.MediaRecorder)return alert('MediaRecorder unavailable');const stream=c.captureStream(30),rec=new MediaRecorder(stream),chunks=[];rec.ondataavailable=e=>chunks.push(e.data);rec.onstop=()=>{const a=document.createElement('a');a.href=URL.createObjectURL(new Blob(chunks,{type:'video/webm'}));a.download='festival-of-bharat-reel.webm';a.click()};rec.start();const end=performance.now()+10000;const tick=n=>{draw((n-(end-10000))/1000);if(n<end)requestAnimationFrame(tick);else rec.stop()};requestAnimationFrame(tick)};
+function fitDraw(ctx,src,cw,ch,zoom=1){const w=src.videoWidth||src.naturalWidth||src.width,h=src.videoHeight||src.naturalHeight||src.height;if(!w||!h)return;const sc=Math.max(cw/w,ch/h)*zoom,ww=w*sc,hh=h*sc;ctx.drawImage(src,(cw-ww)/2,(ch-hh)/2,ww,hh)}
+function draw(t=0){
+ const c=$('canvas'),ctx=c.getContext('2d');ctx.fillStyle='#080808';ctx.fillRect(0,0,c.width,c.height);
+ if(!selected.length){ctx.fillStyle='#aaa';ctx.font='24px Arial';ctx.fillText('Select photos or videos',65,480);return}
+ const a=selected[Math.floor(t/3)%selected.length];
+ if(a.kind==='video'){
+   if(!activeVideo||activeVideo.src!==a.url){if(activeVideo){activeVideo.pause()}activeVideo=document.createElement('video');activeVideo.src=a.url;activeVideo.muted=true;activeVideo.playsInline=true;activeVideo.crossOrigin='anonymous';activeVideo.play().catch(()=>{})}
+   fitDraw(ctx,activeVideo,c.width,c.height,1+0.025*Math.sin(t));
+ }else{
+   const im=new Image();im.crossOrigin='anonymous';im.onload=()=>{ctx.save();fitDraw(ctx,im,c.width,c.height,1+0.035*Math.sin(t));ctx.restore()};im.src=a.url||a.thumb;
+ }
+ ctx.fillStyle='rgba(0,0,0,.25)';ctx.fillRect(0,0,c.width,110);ctx.fillStyle='#fff';ctx.font='bold 28px Arial';ctx.fillText('Festival of Bharat',28,65);
+}
+$('build').onclick=()=>draw(0);
+$('play').onclick=()=>{playing=!playing;if(playing){const st=performance.now();const tick=n=>{if(!playing)return;draw((n-st)/1000);raf=requestAnimationFrame(tick)};raf=requestAnimationFrame(tick)}else if(activeVideo)activeVideo.pause()};
+$('export').onclick=async()=>{if(!selected.length)return alert('Select media first');const c=$('canvas'),stream=c.captureStream(30),rec=new MediaRecorder(stream),chunks=[];rec.ondataavailable=e=>e.data.size&&chunks.push(e.data);rec.onstop=()=>{const a=document.createElement('a');a.href=URL.createObjectURL(new Blob(chunks,{type:'video/webm'}));a.download='festival-of-bharat-reel.webm';a.click()};rec.start();const st=performance.now(),duration=15000;const tick=n=>{draw((n-st)/1000);if(n-st<duration)requestAnimationFrame(tick);else rec.stop()};requestAnimationFrame(tick)};
 draw();
 </script></body></html>
