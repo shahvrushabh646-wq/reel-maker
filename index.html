@@ -157,39 +157,6 @@ function buildSequence(){
    return {media:x,role,label:sc[1],n};
  });
 }
-function templateIcon(t,i){const p=['linear-gradient(145deg,#111827,#4b5563)','linear-gradient(145deg,#171717,#9a7b45)','linear-gradient(145deg,#3b0a0a,#f59e0b)','linear-gradient(145deg,#0f172a,#6d28d9)','linear-gradient(145deg,#172554,#0f766e)','linear-gradient(145deg,#020617,#e11d48)','linear-gradient(145deg,#1c1917,#78716c)','linear-gradient(145deg,#172554,#38bdf8)'];return p[i%p.length]}
-function templateDemoMedia(i){
- const imgs=results.filter(x=>x.kind==='image'), vids=results.filter(x=>x.kind==='video');
- const im=imgs.length?imgs[i%imgs.length]:null, vd=vids.length?vids[i%vids.length]:null;
- const photo=im?.thumbPlay||im?.url||'';
- const video=vd?.thumbPlay||vd?.url||'';
- return {photo,video};
-}
-function renderTemplates(){
- const cats=['All','Slow','Fast','Mixed'];
- $('templateTabs').innerHTML=cats.map(x=>{
-   const count=x==='All'?150:50;
-   return '<button class="tab '+(templateCat===x?'active':'')+'" onclick="setCat(&quot;'+x+'&quot;)">'+esc(x)+' <span style="opacity:.65">('+count+')</span></button>';
- }).join('');
- const query=String($('templateSearch')?.value||'').trim().toLowerCase();
- const filtered=templates.map((t,i)=>({t,i})).filter(({t})=>{
-   const catOk=templateCat==='All'||t.speed===templateCat.toLowerCase();
-   const qOk=!query||String(t.name+' '+t.desc+' '+t.cat).toLowerCase().includes(query);
-   return catOk&&qOk;
- });
- $('templateCount').textContent=filtered.length+' templates';
- $('templateList').innerHTML=filtered.map(({t,i})=>{
-   const m=templateDemoMedia(i);
-   const media=m.video||m.photo;
-   let visual='';
-   if(m.video) visual='<video class="templateDemoMedia" muted playsinline autoplay loop preload="metadata" src="'+esc(m.video)+'"></video>';
-   else if(m.photo) visual='<img class="templateDemoMedia" src="'+esc(m.photo)+'" alt="">';
-   else visual='<div class="templateDemoFallback"><span>'+esc(t.name)+'</span></div>';
-   return '<article class="templateCard '+(activeTemplate===t?'chosen':'')+'">'+
-     '<div class="templateLive">'+visual+'<span class="templateLiveBadge">LIVE DEMO · '+esc(t.speed)+'</span><div class="templateDemoOverlay"><b>'+esc(t.name)+'</b><span>'+esc(t.dur)+'s · 50/50 media mix</span></div></div>'+
-     '<div class="templateCardBody"><div><b>'+esc(t.name)+'</b><span>'+esc(t.desc)+'</span></div><button class="primary" onclick="pickTemplate('+i+');openWorkspace(\'preview\');event.stopPropagation()">Use this template</button></div></article>';
- }).join('') || '<div class="notice" style="grid-column:1/-1">No templates match this search.</div>';
-}
 function pickTemplate(i){
  activeTemplate=templates[i];$('templateName').textContent=activeTemplate.name;$('templateDesc').textContent=activeTemplate.desc;
  $('duration').value=activeTemplate.dur;$('mix').value=100-activeTemplate.mix;$('durVal').textContent=activeTemplate.dur+'s';
@@ -334,8 +301,7 @@ $('export').onclick=async()=>{
  if(exportAudio){try{exportAudio.pause()}catch{}}
  rec.stop();
 };update();draw(0);
-</script>
-<script>
+</script><script>
 const fontLibrary=[
 {name:'Poppins',cat:'Modern',pair:'Poppins + DM Sans',weight:'700'},
 {name:'Montserrat',cat:'Modern',pair:'Montserrat + DM Sans',weight:'700'},
@@ -382,4 +348,132 @@ $('fontUpload').onchange=async e=>{
  }catch(err){alert('Could not load this font. Please use a valid TTF, OTF, WOFF or WOFF2 file.')}
 };
 </script>
-</body></html>
+<script>
+function templateIcon(t,i){const p=['linear-gradient(145deg,#111827,#4b5563)','linear-gradient(145deg,#171717,#9a7b45)','linear-gradient(145deg,#3b0a0a,#f59e0b)','linear-gradient(145deg,#0f172a,#6d28d9)','linear-gradient(145deg,#172554,#0f766e)','linear-gradient(145deg,#020617,#e11d48)','linear-gradient(145deg,#1c1917,#78716c)','linear-gradient(145deg,#172554,#38bdf8)'];return p[i%p.length]}
+function templateDemoMedia(i){
+ const imgs=results.filter(x=>x.kind==='image'), vids=results.filter(x=>x.kind==='video');
+ const im=imgs.length?imgs[i%imgs.length]:null, vd=vids.length?vids[i%vids.length]:null;
+ const photo=im?.thumbPlay||im?.url||'';
+ const video=vd?.thumbPlay||vd?.url||'';
+ return {photo,video};
+}
+function renderTemplates(){
+ const cats=['All','Slow','Fast','Mixed'];
+ $('templateTabs').innerHTML=cats.map(x=>{
+   const count=x==='All'?150:50;
+   return '<button class="tab '+(templateCat===x?'active':'')+'" onclick="setCat(&quot;'+x+'&quot;)">'+esc(x)+' <span style="opacity:.65">('+count+')</span></button>';
+ }).join('');
+ const query=String($('templateSearch')?.value||'').trim().toLowerCase();
+ const filtered=templates.map((t,i)=>({t,i})).filter(({t})=>{
+   const catOk=templateCat==='All'||t.speed===templateCat.toLowerCase();
+   const qOk=!query||String(t.name+' '+t.desc+' '+t.cat).toLowerCase().includes(query);
+   return catOk&&qOk;
+ });
+ $('templateCount').textContent=filtered.length+' templates';
+ $('templateList').innerHTML=filtered.map(({t,i})=>{
+   const m=templateDemoMedia(i);
+   const media=m.video||m.photo;
+   let visual='';
+   if(m.video) visual='<video class="templateDemoMedia" muted playsinline autoplay loop preload="metadata" src="'+esc(m.video)+'"></video>';
+   else if(m.photo) visual='<img class="templateDemoMedia" src="'+esc(m.photo)+'" alt="">';
+   else visual='<div class="templateDemoFallback"><span>'+esc(t.name)+'</span></div>';
+   return '<article class="templateCard '+(activeTemplate===t?'chosen':'')+'">'+
+     '<div class="templateLive">'+visual+'<span class="templateLiveBadge">LIVE DEMO · '+esc(t.speed)+'</span><div class="templateDemoOverlay"><b>'+esc(t.name)+'</b><span>'+esc(t.dur)+'s · 50/50 media mix</span></div></div>'+
+     '<div class="templateCardBody"><div><b>'+esc(t.name)+'</b><span>'+esc(t.desc)+'</span></div><button class="primary" onclick="pickTemplate('+i+');openWorkspace(\'preview\');event.stopPropagation()">Use this template</button></div></article>';
+ }).join('') || '<div class="notice" style="grid-column:1/-1">No templates match this search.</div>';
+}
+function pickTemplate(i){
+ activeTemplate=templates[i];$('templateName').textContent=activeTemplate.name;$('templateDesc').textContent=activeTemplate.desc;
+ $('duration').value=activeTemplate.dur;$('mix').value=100-activeTemplate.mix;$('durVal').textContent=activeTemplate.dur+'s';
+ $('style').value=activeTemplate.cat==='Devotional'?'Devotional':activeTemplate.cat==='Festival'?'Festival':activeTemplate.cat==='Energetic'?'Energetic':activeTemplate.cat==='Storytelling'?'Storytelling':'Cinematic';
+ $('scenePlan').innerHTML=activeTemplate.scenes.map(s=>'<span class="scene-chip">'+esc(s[1])+'</span>').join('');
+ sequence=buildSequence();renderTemplates();update();renderToken++;draw(0);
+}
+window.setCat=c=>{templateCat=c;renderTemplates()};window.pickTemplate=pickTemplate;
+renderTemplates();pickTemplate(0);
+$('duration').oninput=e=>{$('durVal').textContent=e.target.value+'s';sequence=buildSequence();renderToken++;draw(0)};$('mix').oninput=()=>{update();sequence=buildSequence();renderToken++;draw(0)};
+$('selectAll').onclick=()=>{results.forEach(x=>{if(!selected.some(a=>a.id===x.id))selected.push(x)});render();draw(0)};
+$('clear').onclick=()=>{selected.length=0;render();draw(0)};
+$('importBtn').onclick=()=>$('files').click();
+$('files').onchange=e=>{[...e.target.files].forEach(f=>{const u=URL.createObjectURL(f);results.unshift({id:crypto.randomUUID(),title:f.name,source:'Local',url:u,playUrl:u,thumbPlay:u,kind:f.type.startsWith('video')?'video':'image'})});autoSelect();sequence=buildSequence();render();renderToken++;draw(0)};
+async function json(u){try{const r=await fetch(u);return r.ok?await r.json():null}catch{return null}}
+async function search(q){$('statusTop').textContent='RESEARCHING';$('sourceStatus').textContent='Loading licensed media…';results.length=0;selected.length=0;render();const out=[],seen=new Set(),add=x=>{if(x.url&&!seen.has(x.url)){seen.add(x.url);x.playUrl=proxy(x.url);x.thumbPlay=x.thumb?proxy(x.thumb):x.playUrl;out.push(x)}};
+for(const term of [q,q+' temple',q+' festival',q+' deity',q+' India',q+' aerial']){const j=await json('https://api.openverse.org/v1/images/?q='+encodeURIComponent(term)+'&page_size=100&license_type=commercial,modification&size=large');(j?.results||[]).forEach(x=>add({id:'ov'+x.id,title:x.title,source:'Openverse',url:x.url,thumb:x.thumbnail||x.url,kind:'image'}))}
+for(const term of [q,q+' temple',q+' festival',q+' deity',q+' architecture',q+' India']){const j=await json('https://commons.wikimedia.org/w/api.php?action=query&generator=search&gsrsearch='+encodeURIComponent(term)+'&gsrnamespace=6&gsrlimit=100&prop=imageinfo&iiprop=url|mime|size&iiurlwidth=700&format=json&origin=*');Object.values(j?.query?.pages||{}).forEach(x=>{const z=x.imageinfo?.[0];if(z?.url&&!String(z.mime||'').startsWith('video/'))add({id:'wm'+x.pageid,title:x.title,source:'Wikimedia Commons',url:z.url,thumb:z.thumburl||z.url,kind:'image'})})}
+for(const term of [q+' filetype:video',q+' temple filetype:video',q+' festival filetype:video',q+' India filetype:video',q+' aerial filetype:video',q+' cinematic filetype:video']){const j=await json('https://commons.wikimedia.org/w/api.php?action=query&generator=search&gsrsearch='+encodeURIComponent(term)+'&gsrnamespace=6&gsrlimit=100&prop=imageinfo&iiprop=url|mime|size&iiurlwidth=700&format=json&origin=*');Object.values(j?.query?.pages||{}).forEach(x=>{const z=x.imageinfo?.[0];if(z?.url&&String(z.mime||'').startsWith('video/'))add({id:'wv'+x.pageid,title:x.title,source:'Wikimedia Commons',url:z.url,thumb:z.thumburl||'',kind:'video'})})}
+results.push(...out.filter(x=>x.kind==='image').slice(0,120),...out.filter(x=>x.kind==='video').slice(0,120));$('sourceStatus').textContent='Loaded '+results.filter(x=>x.kind==='image').length+' photos + '+results.filter(x=>x.kind==='video').length+' videos';$('statusTop').textContent='READY';autoSelect();sequence=buildSequence();render();renderToken++;draw(0);}
+$('form').onsubmit=e=>{e.preventDefault();search($('q').value.trim())};
+function autoSelect(){selected.length=0;const im=results.filter(x=>x.kind==='image'),vi=results.filter(x=>x.kind==='video');let a=0,b=0;while(selected.length<16&&(a<im.length||b<vi.length)){if(b<vi.length&&selected.length%3===2)selected.push(vi[b++]);else if(a<im.length)selected.push(im[a++]);else if(b<vi.length)selected.push(vi[b++]);else break}update();}
+$('generate').onclick=()=>{if(!results.length)return $('form').requestSubmit();autoSelect();sequence=buildSequence();renderToken++;$('build').click();start()};
+const imageCache=new Map(),videoCache=new Map();
+function fit(ctx,s,cw,ch,z=1,panX=0,panY=0,rot=0){const w=s.videoWidth||s.naturalWidth||s.width,h=s.videoHeight||s.naturalHeight||s.height;if(!w||!h)return false;const sc=Math.max(cw/w,ch/h)*z;ctx.save();ctx.translate(cw/2+panX,ch/2+panY);ctx.rotate(rot);ctx.drawImage(s,-w*sc/2,-h*sc/2,w*sc,h*sc);ctx.restore();return true}
+function loadImage(url){if(imageCache.has(url))return imageCache.get(url);const p=new Promise((resolve,reject)=>{const im=new Image();im.onload=()=>resolve(im);im.onerror=reject;im.decoding='async';im.crossOrigin='anonymous';im.src=url});imageCache.set(url,p);return p}
+function loadVideo(a){
+ if(videoCache.has(a.id))return videoCache.get(a.id);
+ const p=new Promise(resolve=>{const v=document.createElement('video');v.src=a.playUrl;v.muted=true;v.playsInline=true;v.preload='auto';v.crossOrigin='anonymous';const done=()=>resolve(v);v.addEventListener('loadeddata',done,{once:true});v.addEventListener('error',done,{once:true});setTimeout(done,3500)});videoCache.set(a.id,p);return p;
+}
+function sceneAt(t){
+ if(!sequence.length)sequence=buildSequence();
+ const dur=+$('duration').value, n=sequence.length, raw=((t%dur)+dur)%dur, slot=dur/n, idx=Math.min(n-1,Math.floor(raw/slot)), local=(raw-idx*slot)/slot;
+ return {scene:sequence[idx],idx,local,slot};
+}
+async function draw(t){
+ const token=renderToken,c=$('canvas'),ctx=c.getContext('2d');ctx.fillStyle='#050607';ctx.fillRect(0,0,c.width,c.height);
+ if(!selected.length){ctx.fillStyle='#9aa4b0';ctx.font='24px Arial';ctx.textAlign='center';ctx.fillText('Select media to build preview',270,480);ctx.textAlign='left';return}
+ const {scene,idx,local,slot}=sceneAt(t),a=scene.media;
+ try{
+   const isVideo=a.kind==='video';
+   let media=isVideo?await loadVideo(a):await loadImage(a.playUrl);
+   if(token!==renderToken)return;
+   const speed=$('speed').value,fast=speed.includes('Fast'),slow=speed.includes('Slow');
+   let z=1.02+.07*local,px=0,py=0,rot=0;
+   if(activeTemplate.motion==='photo-cinema'||!isVideo){
+     if(local<.5){z=1.02+.11*local*2;px=-18*local;py=10*local}
+     else{z=1.13-.10*(local-.5)*2;px=-18+36*(local-.5)*2;py=10-20*(local-.5)*2;rot=(local-.5)*.012}
+   }
+   if(activeTemplate.motion==='slow-push'){z=1.02+.08*local}
+   if(activeTemplate.motion==='pan'){px=-28+56*local;z=1.06}
+   if(activeTemplate.motion==='reveal'){z=1.18-.12*local;py=18-36*local}
+   if(activeTemplate.motion==='beat-cut'||fast)z=1.04+.04*Math.sin(local*Math.PI*2);
+   if(slow)z-=.015;
+   if(isVideo){const vd=media.duration||slot;try{const target=Math.min(Math.max(0,local*vd),Math.max(0,vd-.05));if(Math.abs(media.currentTime-target)>.12)media.currentTime=target}catch{}media.play().catch(()=>{})}
+   fit(ctx,media,c.width,c.height,z,px,py,rot);
+   if(activeTemplate.transition==='fade'&&local<.14){ctx.fillStyle='rgba(0,0,0,'+((.14-local)/.14)+')';ctx.fillRect(0,0,c.width,c.height)}
+   if(activeTemplate.transition==='flash'&&local<.07){ctx.fillStyle='rgba(255,255,255,'+((.07-local)/.07*.35)+')';ctx.fillRect(0,0,c.width,c.height)}
+   overlay(ctx,idx,scene.label);
+   $('bar').style.width=(raw/dur*100)+'%';
+ }catch(e){ctx.fillStyle='#111';ctx.fillRect(0,0,c.width,c.height);ctx.fillStyle='#ffcc80';ctx.font='20px Arial';ctx.textAlign='center';ctx.fillText('Media could not be previewed',270,450);ctx.font='14px Arial';ctx.fillText(a?.source||'Unknown source',270,480);ctx.textAlign='left'}
+}
+function overlay(ctx,idx,label){ctx.fillStyle='rgba(0,0,0,.34)';ctx.fillRect(0,0,540,120);const ff=$('fontFamily')?.value||'Noto Sans';ctx.fillStyle='#fff';ctx.font=($('fontWeight')?.value||'700')+' 27px "'+ff+'",sans-serif';ctx.fillText('Festival of Bharat',25,52);ctx.font='600 17px "'+ff+'",sans-serif';ctx.fillText((idx+1)+' / '+(sequence.length||selected.length)+' · '+(label||''),25,84);const txt=$('captionText')?.value?.trim();if(txt){ctx.textAlign='center';ctx.font=($('fontWeight')?.value||'700')+' '+($('fontSize')?.value||34)+'px "'+ff+'",sans-serif';const y=$('captionPos').value==='top'?155:$('captionPos').value==='middle'?500:875;ctx.fillStyle='rgba(0,0,0,.48)';ctx.fillRect(25,y-43,490,58);ctx.fillStyle='#fff';ctx.fillText(txt,270,y);ctx.textAlign='left'}}
+function start(){if(playing)return;playing=true;started=performance.now();const f=n=>{if(!playing)return;draw((n-started)/1000);raf=requestAnimationFrame(f)};raf=requestAnimationFrame(f)}
+$('build').onclick=async()=>{if(!selected.length)autoSelect();sequence=buildSequence();renderToken++;$('qc').textContent='QC: Building template scenes…';await draw(0);$('qc').textContent='QC: '+sequence.length+' scenes · '+activeTemplate.name+' · '+$('duration').value+'s · '+(selected.filter(x=>x.kind==='video').length?'video + ':'')+(selected.filter(x=>x.kind==='image').length?'photo':'')+' media ready';};
+$('play').onclick=()=>{if(!selected.length)autoSelect();start()};$('stop').onclick=()=>{playing=false;cancelAnimationFrame(raf);if(activeVideo)activeVideo.pause()};
+let selectedMusic=null,musicResults=[],musicPreview=null;
+function musicEsc(s){return String(s||'').replace(/[&<>\"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));}
+function renderMusic(){
+ $('musicList').innerHTML=musicResults.length?musicResults.map((x,i)=>'<div class="music '+(selectedMusic?.id===x.id?'selected':'')+'"><div class="row"><button class="secondary" onclick="previewTrack('+i+')" '+(x.audio?'':'disabled')+'>▶</button><div style="flex:1;min-width:0"><b>'+musicEsc(x.name)+'</b><span>'+musicEsc(x.artist_name||'Unknown artist')+' · '+(x.duration?Math.round((+x.duration||0)/60)+':'+String((+x.duration||0)%60).padStart(2,'0')+' · ':'')+musicEsc(x.source||'Music catalog')+'</span></div>'+(x.audio?'<button class="secondary" onclick="selectTrack('+i+')">'+(selectedMusic?.id===x.id?'✓ Selected':'Select')+'</button>':(x.landing?'<a class="secondary" target="_blank" rel="noopener" href="'+musicEsc(x.landing)+'">Open</a>':''))+'</div></div>').join(''):'<div class="muted">Search for a song, artist, bhajan or festival music.</div>';
+}
+window.previewTrack=async i=>{const x=musicResults[i];if(!x?.audio)return;try{if(musicPreview){musicPreview.pause();musicPreview=null}musicPreview=new Audio(x.audio);musicPreview.currentTime=0;await musicPreview.play();$('musicInfo').textContent='Previewing: '+x.name+' · '+x.artist_name}catch(e){$('musicInfo').textContent='Preview unavailable for this track.'}};
+window.selectTrack=i=>{const x=musicResults[i];if(!x)return;selectedMusic=x;if(musicPreview){musicPreview.pause();musicPreview=null}$('musicStart').value=0;$('musicEnd').value=Math.min(+$('duration').value,+x.duration||15);$('musicInfo').textContent='Selected: '+x.name+' · '+x.artist_name+' · '+x.duration+'s';renderMusic()};
+$('musicSearchBtn').onclick=async()=>{const q=$('musicQuery').value.trim();if(!q)return;$('musicCatalogStatus').textContent='Searching licensed music…';try{const j=await json('/music-search?q='+encodeURIComponent(q));if(!j||j.error){$('musicCatalogStatus').textContent=j?.error||'Music search failed';musicResults=[];renderMusic();return}musicResults=(j.results||[]).map(x=>({id:x.id,name:x.name||'Untitled track',artist_name:x.artist_name||'Unknown artist',duration:+x.duration||0,audio:x.audio||null,source:x.source||'Music catalog',landing:x.landing||'',license_ccurl:x.license_ccurl||'',audiodownload_allowed:x.audiodownload_allowed!==false}));$('musicCatalogStatus').textContent='Found '+musicResults.length+' results · '+musicResults.filter(x=>x.audio).length+' playable previews';renderMusic()}catch(e){$('musicCatalogStatus').textContent='Music search failed: '+e.message}};
+$('importMusicBtn').onclick=()=>$('musicFile').click();
+$('musicFile').onchange=async e=>{const f=e.target.files?.[0];if(!f)return;try{if(musicPreview){musicPreview.pause();musicPreview=null}if(audioObj){audioObj.pause();audioObj.src='';audioObj=null}audioURL=URL.createObjectURL(f);audioObj=new Audio(audioURL);audioObj.preload='metadata';audioObj.onloadedmetadata=()=>{$('musicStart').value=0;$('musicEnd').value=Math.min(+$('duration').value||15,Number.isFinite(audioObj.duration)?audioObj.duration:15);$('musicInfo').textContent='Imported: '+f.name+' · '+Math.round((audioObj.duration||0))+'s · Ready for reel';};audioObj.onerror=()=>{$('musicInfo').textContent='This music file could not be decoded by the browser.'};}catch(err){$('musicInfo').textContent='Import failed: '+err.message}};
+$('previewMusic').onclick=async()=>{if(!audioObj)return alert('Choose a music track or import a song first');audioObj.currentTime=+$('musicStart').value;await audioObj.play();audioObj.ontimeupdate=()=>{if(audioObj.currentTime>=+$('musicEnd').value){audioObj.pause();audioObj.ontimeupdate=null}}};
+$('stopMusic').onclick=()=>audioObj?.pause();musicPreview?.pause();
+$('export').onclick=async()=>{if(!selected.length)autoSelect();const c=$('canvas'),stream=c.captureStream(30);const chosenUrl=selectedMusic?.audio||null;let exportAudio=null;try{if(chosenUrl){exportAudio=new Audio(chosenUrl);exportAudio.crossOrigin='anonymous';exportAudio.preload='auto'}else if(audioObj){exportAudio=audioObj}if(exportAudio){if(!audioCtx){audioCtx=new AudioContext();audioDest=audioCtx.createMediaStreamDestination()}if(audioSource){try{audioSource.disconnect()}catch{}}audioSource=audioCtx.createMediaElementSource(exportAudio);audioSource.connect(audioDest);audioSource.connect(audioCtx.destination);if(audioCtx.state==='suspended')await audioCtx.resume();stream.addTrack(audioDest.stream.getAudioTracks()[0])}}catch(e){console.warn('Audio mux unavailable',e);exportAudio=null}$('qc').textContent='QC: Recording '+(exportAudio?'with music':'without music');const mime=MediaRecorder.isTypeSupported('video/webm;codecs=vp9,opus')?'video/webm;codecs=vp9,opus':(MediaRecorder.isTypeSupported('video/webm;codecs=vp9')?'video/webm;codecs=vp9':'video/webm'),rec=new MediaRecorder(stream,{mimeType:mime,videoBitsPerSecond:8000000}),chunks=[];rec.ondataavailable=e=>e.data.size&&chunks.push(e.data);rec.onstop=async()=>{const blob=new Blob(chunks,{type:mime});$('qc').textContent='QC: Converting to MP4 / H.264 for Instagram Edits…';try{const converted=await fetch('/convert-mp4',{method:'POST',headers:{'Content-Type':'video/webm'},body:blob});if(!converted.ok)throw new Error(await converted.text());const mp4=await converted.blob(),a=document.createElement('a');a.href=URL.createObjectURL(mp4);a.download='festival-of-bharat-'+activeTemplate.name.toLowerCase().replace(/ /g,'-')+'-edits-ready.mp4';a.click();setTimeout(()=>URL.revokeObjectURL(a.href),30000);$('qc').textContent='QC: MP4/H.264 reel created · 1080×1920 · 30 FPS · Instagram Edits-ready'}catch(err){const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download='festival-of-bharat-'+activeTemplate.name.toLowerCase().replace(/ /g,'-')+'.webm';a.click();setTimeout(()=>URL.revokeObjectURL(a.href),30000);$('qc').textContent='QC: MP4 conversion failed; WebM backup exported. '+String(err.message||err).slice(0,160)}};rec.start(200);const startAt=Math.max(0,+$('musicStart').value||0),endAt=Math.max(startAt,+$('musicEnd').value||startAt+$('duration').value);if(exportAudio){try{exportAudio.currentTime=startAt;await exportAudio.play()}catch(e){console.warn('Music playback failed',e)}}if(exportAudio)exportAudio.ontimeupdate=()=>{if(exportAudio.currentTime>=endAt){exportAudio.pause();exportAudio.ontimeupdate=null}};const st=performance.now(),d=+$('duration').value*1000;playing=true;const f=n=>{draw((n-st)/1000);if(n-st<d)requestAnimationFrame(f);else{playing=false;if(exportAudio)exportAudio.pause();rec.stop()}};requestAnimationFrame(f)};
+update();draw(0);
+</script></body></html><script>
+$('captionText').oninput=()=>draw(0);$('fontFamily').onchange=()=>{$('fontPreview').style.fontFamily='"'+$('fontFamily').value+'",sans-serif';draw(0)};$('captionPos').onchange=()=>draw(0);
+$('captionLang').onchange=()=>{const s={English:'Festival of Bharat',Hindi:'जय श्री महाकाल',Gujarati:'જય શ્રી મહાકાલ',Marathi:'जय श्री महाकाल',Sanskrit:'ॐ नमः शिवाय',Tamil:'ஓம் நமசிவாய',Telugu:'ఓం నమః శివాయ',Bengali:'জয় শ্রী মহাকাল',Kannada:'ಓಂ ನಮಃ ಶಿವಾಯ',Malayalam:'ഓം നമഃ ശിവായ',Punjabi:'ਜੈ ਸ਼੍ਰੀ ਮਹਾਕਾਲ'};$('captionText').value=s[$('captionLang').value]||'';$('fontPreview').textContent=$('captionText').value||'Festival of Bharat';draw(0)};
+</script>
+<script>
+$('fontWeight').onchange=()=>draw(0);
+$('fontSize').oninput=e=>{$('fontSizeVal').textContent=e.target.value+'px';draw(0)};
+$('fontUploadBtn').onclick=()=>$('fontUpload').click();
+$('fontUpload').onchange=async e=>{
+ const f=e.target.files[0]; if(!f)return;
+ try{const name='Custom-'+f.name.replace(/[^a-zA-Z0-9]/g,'-');const face=new FontFace(name,'url('+URL.createObjectURL(f)+')');await face.load();document.fonts.add(face);
+ const o=document.createElement('option');o.textContent=f.name;o.value=name;$('fontFamily').appendChild(o);$('fontFamily').value=name;$('fontPreview').style.fontFamily='"'+name+'",sans-serif';draw(0);
+ }catch(err){alert('Could not load this font. Please use a valid TTF, OTF, WOFF or WOFF2 file.')}
+};
+</script>
