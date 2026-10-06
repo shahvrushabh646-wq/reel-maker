@@ -393,6 +393,7 @@ function sceneAt(t){
 }
 async function draw(t,captureFrame=false){
  const token=renderToken,c=$('canvas'),ctx=c.getContext('2d');ctx.fillStyle='#050607';ctx.fillRect(0,0,c.width,c.height);
+ await ensureSelectedFontReady();
  if(!selected.length){ctx.fillStyle='#9aa4b0';ctx.font='48px Arial';ctx.textAlign='center';ctx.fillText('Select media to build preview',540,960);ctx.textAlign='left';return}
  const {scene,idx,local,slot}=sceneAt(t),a=scene.media;
  try{
@@ -438,6 +439,26 @@ async function draw(t,captureFrame=false){
    $('bar').style.width=(raw/dur*100)+'%';
  }catch(e){ctx.fillStyle='#111';ctx.fillRect(0,0,c.width,c.height);ctx.fillStyle='#ffcc80';ctx.font='40px Arial';ctx.textAlign='center';ctx.fillText('Media could not be previewed',540,900);ctx.font='28px Arial';ctx.fillText(a?.source||'Unknown source',540,960);ctx.textAlign='left'}
 }
+async function ensureSelectedFontReady(){
+ const family=String($('fontFamily')?.value||'Noto Sans').trim()||'Noto Sans';
+ const weight=String($('fontWeight')?.value||'700');
+ const size=Math.max(20,Number($('fontSize')?.value||34));
+ const sample=String($('captionText')?.value||'Festival of Bharat · भारत की संस्कृति · ભારતની સંસ્કૃતિ · जय श्री महाकाल');
+ if(typeof document==='undefined'||!document.fonts?.load)return family;
+ try{
+   await Promise.all([
+     document.fonts.load(weight+' '+(size*2)+'px "'+family+'"',sample),
+     document.fonts.load('600 54px "'+family+'"',sample)
+   ]);
+   await document.fonts.ready;
+ }catch(e){
+   throw new Error('Font load failed for "'+family+'": '+String(e.message||e));
+ }
+ if(!document.fonts.check(weight+' '+(size*2)+'px "'+family+'"',sample)){
+   throw new Error('Font "'+family+'" is not ready for canvas rendering');
+ }
+ return family;
+}
 function overlay(ctx,idx,label){ctx.fillStyle='rgba(0,0,0,.34)';ctx.fillRect(0,0,1080,240);const ff=$('fontFamily')?.value||'Noto Sans';ctx.fillStyle='#fff';ctx.font=($('fontWeight')?.value||'700')+' 54px "'+ff+'",sans-serif';ctx.fillText('Festival of Bharat',50,104);ctx.font='600 34px "'+ff+'",sans-serif';ctx.fillText((idx+1)+' / '+(sequence.length||selected.length)+' · '+(label||''),50,168);const txt=$('captionText')?.value?.trim();if(txt){ctx.textAlign='center';ctx.font=($('fontWeight')?.value||'700')+' '+(($('fontSize')?.value||34)*2)+'px "'+ff+'",sans-serif';const y=$('captionPos').value==='top'?310:$('captionPos').value==='middle'?1000:1750;ctx.fillStyle='rgba(0,0,0,.48)';ctx.fillRect(50,y-86,980,116);ctx.fillStyle='#fff';ctx.fillText(txt,540,y);ctx.textAlign='left'}}
 function start(){if(playing)return;playing=true;started=performance.now();const f=async n=>{if(!playing)return;await draw((n-started)/1000);if(playing)raf=requestAnimationFrame(f)};raf=requestAnimationFrame(f)}
 $('build').onclick=async()=>{
@@ -477,18 +498,26 @@ $('export').onclick=async()=>{
  if(!selected.length){$('qc').textContent='QC: Add or import media first';return}
  if(!sequence.length)sequence=buildSequence();
  if(!sequence.length){$('qc').textContent='QC: No usable scenes found';return}
+ try{
+   await ensureSelectedFontReady();
+ }catch(e){
+   $('qc').textContent='QC: Export stopped — '+String(e.message||e);
+   return;
+ }
  renderToken++;
  openWorkspace('preview');
  await new Promise(requestAnimationFrame);
- await draw(0,true);
- const c=$('canvas'),stream=c.captureStream(30);
+ try{await draw(0,true)}catch(e){$('qc').textContent='QC: First frame failed — '+String(e.message||e);return}
+ const c=$('canvas');
+ if(typeof c.captureStream!=='function'){$('qc').textContent='QC: Browser does not support canvas video capture';return}
+ const stream=c.captureStream(30);
  if(!stream.getVideoTracks().length){$('qc').textContent='QC: Browser did not provide a canvas video track';return}
  let exportAudio=null;
  try{
    const musicSrc=selectedMusic?.audio||null;
    if(musicSrc){
      if(audioObj){try{audioObj.pause()}catch{}}
-     audioObj=new Audio(musicSrc);audioObj.crossOrigin=selectedMusic?.local?'anonymous':'anonymous';audioObj.preload='auto';
+     audioObj=new Audio(musicSrc);audioObj.crossOrigin='anonymous';audioObj.preload='auto';
      if(!audioCtx)audioCtx=new AudioContext();
      if(audioCtx.state==='suspended')await audioCtx.resume();
      audioSource=audioCtx.createMediaElementSource(audioObj);
@@ -497,43 +526,58 @@ $('export').onclick=async()=>{
      const track=audioDest.stream.getAudioTracks()[0];if(track)stream.addTrack(track);
      exportAudio=audioObj;
    }
- }catch(e){console.warn('Audio export unavailable',e);$('qc').textContent='QC: Video recording; audio could not be attached in this browser'}
+ }catch(e){console.warn('Audio export unavailable',e);$('qc').textContent='QC: Video recording; audio could not be attached'}
  const mimeCandidates=['video/webm;codecs=vp8,opus','video/webm;codecs=vp9,opus','video/webm;codecs=vp8','video/webm'];
  const mime=mimeCandidates.find(x=>MediaRecorder.isTypeSupported(x))||'video/webm';
- let rec;try{
-   rec=new MediaRecorder(stream,{mimeType:mime,videoBitsPerSecond:8000000});
- }catch(e){
-   $('qc').textContent='QC: Browser cannot record this reel: '+String(e.message||e);
-   stream.getTracks().forEach(t=>t.stop());
-   return;
- }
+ let rec;
+ try{rec=new MediaRecorder(stream,{mimeType:mime,videoBitsPerSecond:8000000})}
+ catch(e){$('qc').textContent='QC: Browser cannot record this reel: '+String(e.message||e);stream.getTracks().forEach(t=>t.stop());return}
  const chunks=[];
- rec.ondataavailable=e=>{if(e.data.size)chunks.push(e.data)};
+ let stopped=false;
+ rec.ondataavailable=e=>{if(e.data?.size)chunks.push(e.data)};
+ rec.onerror=e=>{console.error('MediaRecorder error',e)};
  rec.onstop=async()=>{
-   const blob=new Blob(chunks,{type:mime});
-   $('qc').textContent='QC: Converting to MP4 / H.264 for Instagram Edits…';
+   if(stopped)return;stopped=true;
+   const webm=new Blob(chunks,{type:mime});
+   if(webm.size<1024){$('qc').textContent='QC: Recording failed — empty/invalid WebM was produced';stream.getTracks().forEach(t=>t.stop());return}
+   $('qc').textContent='QC: Converting WebM to MP4 / H.264…';
    try{
-     const converted=await fetch('/convert-mp4',{method:'POST',headers:{'Content-Type':'video/webm'},body:blob});
-     if(!converted.ok) throw new Error(await converted.text());
+     const controller=new AbortController(),timer=setTimeout(()=>controller.abort(),300000);
+     let converted;
+     try{
+       converted=await fetch('/convert-mp4',{method:'POST',headers:{'Content-Type':'video/webm'},body:webm,signal:controller.signal});
+     }finally{clearTimeout(timer)}
+     if(!converted.ok){
+       const detail=await converted.text().catch(()=>converted.statusText);
+       throw new Error('Server returned '+converted.status+(detail?' — '+detail.slice(0,240):''));
+     }
+     const type=String(converted.headers.get('content-type')||'').toLowerCase();
+     if(!type.includes('video/mp4'))throw new Error('Server did not return video/mp4 (received '+(type||'unknown')+')');
      const mp4=await converted.blob();
-     const a=document.createElement('a');
-     a.href=URL.createObjectURL(mp4);
-     a.download='festival-of-bharat-'+activeTemplate.name.toLowerCase().replace(/[^a-z0-9]+/g,'-')+'-edits-ready.mp4';
-     a.click();
-     setTimeout(()=>URL.revokeObjectURL(a.href),30000);
-     $('qc').textContent='QC: MP4/H.264 reel created · 1080×1920 · 30 FPS · Instagram Edits-ready · '+$('duration').value+'s';
+     if(mp4.size<10000)throw new Error('Converted MP4 is unexpectedly small ('+mp4.size+' bytes)');
+     const head=new Uint8Array(await mp4.slice(0,32).arrayBuffer());
+     const sig=String.fromCharCode(...head.slice(4,8));
+     if(sig!=='ftyp')throw new Error('Converted file is not a valid MP4 container');
+     const a=document.createElement('a'),url=URL.createObjectURL(mp4);
+     a.href=url;a.download='festival-of-bharat-'+activeTemplate.name.toLowerCase().replace(/[^a-z0-9]+/g,'-')+'-edits-ready.mp4';a.click();
+     setTimeout(()=>URL.revokeObjectURL(url),30000);
+     $('qc').textContent='QC: MP4/H.264 verified · '+Math.round(mp4.size/1024)+' KB · 1080×1920 · 30 FPS · '+$('duration').value+'s';
    }catch(err){
-     const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download='festival-of-bharat-'+activeTemplate.name.toLowerCase().replace(/[^a-z0-9]+/g,'-')+'.webm';a.click();
-     setTimeout(()=>URL.revokeObjectURL(a.href),30000);
-     $('qc').textContent='QC: MP4 conversion failed; WebM backup exported. '+String(err.message||err).slice(0,160);
+     const msg=String(err?.name==='AbortError'?'MP4 conversion timed out after 5 minutes':(err?.message||err));
+     const a=document.createElement('a'),url=URL.createObjectURL(webm);
+     a.href=url;a.download='festival-of-bharat-'+activeTemplate.name.toLowerCase().replace(/[^a-z0-9]+/g,'-')+'.webm';a.click();
+     setTimeout(()=>URL.revokeObjectURL(url),30000);
+     $('qc').textContent='QC: MP4 conversion failed; WebM backup exported — '+msg.slice(0,180);
+   }finally{
+     stream.getTracks().forEach(t=>t.stop());
+     if(exportAudio){try{exportAudio.pause()}catch{}}
    }
  };
  if(exportAudio){
    exportAudio.currentTime=Math.max(0,+$('musicStart').value||0);
    exportAudio.ontimeupdate=()=>{const end=+$('musicEnd').value||0;if(end>0&&exportAudio.currentTime>=end){exportAudio.pause();exportAudio.ontimeupdate=null}};
-   try{await exportAudio.play()}catch{}
+   try{await exportAudio.play()}catch(e){console.warn('Audio playback could not start',e)}
  }
- // First frame is rendered before captureStream recording begins.
  rec.start(200);
  $('qc').textContent='QC: Creating reel… 0%';
  const duration=Math.max(1,+$('duration').value||15),startedAt=performance.now();
@@ -549,7 +593,7 @@ $('export').onclick=async()=>{
  await draw(duration-.001,true);
  if(exportAudio){try{exportAudio.pause()}catch{}}
  rec.stop();
-};update();draw(0);
+update();draw(0);
 </script><script>
 const fontLibrary=[
 {name:'Poppins',cat:'Modern',pair:'Poppins + DM Sans',weight:'700'},
@@ -580,10 +624,10 @@ function renderFontLibrary(){
  $('fontLibrary').innerHTML=list.map(x=>'<div class="fontCard '+($('fontFamily').value===x.name?'selected':'')+'" onclick="chooseFont(\''+esc(x.name).replace(/'/g,"\\'")+'\')"><span class="fontBadge">'+esc(x.cat)+'</span><div class="fontName" style="font-family:\''+esc(x.name)+'\'">'+esc(x.name)+'</div><small>Festival of Bharat · जय श्री महाकाल · શુભ</small><div class="pair">Pairing: '+esc(x.pair)+'</div></div>').join('');
 }
 window.setFontCat=c=>{fontCat=c;renderFontLibrary()};
-window.chooseFont=name=>{const s=[...$('fontFamily').options].find(o=>o.value===name);if(!s){const o=document.createElement('option');o.textContent=name;o.value=name;$('fontFamily').appendChild(o)}$('fontFamily').value=name;$('fontPreview').style.fontFamily='"'+name+'",sans-serif';renderFontLibrary();draw(0)};
+window.chooseFont=async name=>{const s=[...$('fontFamily').options].find(o=>o.value===name);if(!s){const o=document.createElement('option');o.textContent=name;o.value=name;$('fontFamily').appendChild(o)}$('fontFamily').value=name;$('fontPreview').style.fontFamily='"'+name+'",sans-serif';renderFontLibrary();try{await ensureSelectedFontReady();await draw(0)}catch(e){$('qc').textContent='QC: '+String(e.message||e)}};
 $('fontSearch').oninput=e=>{fontQuery=e.target.value;renderFontLibrary()};
 renderFontLibrary();
-$('captionText').oninput=()=>draw(0);$('fontFamily').onchange=()=>{$('fontPreview').style.fontFamily='"'+$('fontFamily').value+'",sans-serif';draw(0)};$('captionPos').onchange=()=>draw(0);
+$('captionText').oninput=()=>draw(0);$('fontFamily').onchange=async()=>{$('fontPreview').style.fontFamily='"'+$('fontFamily').value+'",sans-serif';try{await ensureSelectedFontReady();await draw(0)}catch(e){$('qc').textContent='QC: '+String(e.message||e)}};$('captionPos').onchange=()=>draw(0);
 $('captionLang').onchange=()=>{const s={English:'Festival of Bharat',Hindi:'जय श्री महाकाल',Gujarati:'જય શ્રી મહાકાલ',Marathi:'जय श्री महाकाल',Sanskrit:'ॐ नमः शिवाय',Tamil:'ஓம் நமசிவாய',Telugu:'ఓం నమః శివాయ',Bengali:'জয় শ্রী মহাকাল',Kannada:'ಓಂ ನಮಃ ಶಿವಾಯ',Malayalam:'ഓം നമഃ ശിവായ',Punjabi:'ਜੈ ਸ਼੍ਰੀ ਮਹਾਕਾਲ'};$('captionText').value=s[$('captionLang').value]||'';$('fontPreview').textContent=$('captionText').value||'Festival of Bharat';draw(0)};
 </script>
 <script>
@@ -592,8 +636,8 @@ $('fontSize').oninput=e=>{$('fontSizeVal').textContent=e.target.value+'px';draw(
 $('fontUploadBtn').onclick=()=>$('fontUpload').click();
 $('fontUpload').onchange=async e=>{
  const f=e.target.files[0]; if(!f)return;
- try{const name='Custom-'+f.name.replace(/[^a-zA-Z0-9]/g,'-');const face=new FontFace(name,'url('+URL.createObjectURL(f)+')');await face.load();document.fonts.add(face);
- const o=document.createElement('option');o.textContent=f.name;o.value=name;$('fontFamily').appendChild(o);$('fontFamily').value=name;$('fontPreview').style.fontFamily='"'+name+'",sans-serif';draw(0);
+ try{const name='Custom-'+f.name.replace(/[^a-zA-Z0-9]/g,'-');const face=new FontFace(name,'url('+URL.createObjectURL(f)+')');await face.load();document.fonts.add(face);await ensureSelectedFontReady();
+ const o=document.createElement('option');o.textContent=f.name;o.value=name;$('fontFamily').appendChild(o);$('fontFamily').value=name;$('fontPreview').style.fontFamily='"'+name+'",sans-serif';await ensureSelectedFontReady();await draw(0);
  }catch(err){alert('Could not load this font. Please use a valid TTF, OTF, WOFF or WOFF2 file.')}
 };
 </script>
