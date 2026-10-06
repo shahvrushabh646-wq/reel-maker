@@ -178,12 +178,27 @@ function templateDemoMedia(i){
  return {photo,video};
 }
 function playTemplateVideos(root=document){
- root.querySelectorAll('video.templateDemoMedia, video.templatePreviewVideo').forEach(v=>{
-   v.muted=true; v.defaultMuted=true; v.playsInline=true; v.setAttribute('muted',''); v.setAttribute('playsinline',''); v.setAttribute('autoplay','');
+ const videos=[...root.querySelectorAll('video.templateDemoMedia, video.templatePreviewVideo')];
+ if(!videos.length)return;
+ const activate=v=>{
+   v.muted=true; v.defaultMuted=true; v.playsInline=true;
+   v.setAttribute('muted',''); v.setAttribute('playsinline','');
+   if(!v.src){
+     const src=v.dataset.src;
+     if(src){v.src=src;v.preload='metadata';}
+   }
    const go=()=>{try{const p=v.play(); if(p&&p.catch)p.catch(()=>{});}catch(e){}};
-   if(v.readyState>=2) go(); else v.addEventListener('canplay',go,{once:true});
-   v.addEventListener('loadeddata',go,{once:true});
- });
+   if(v.readyState>=2)go();else v.addEventListener('canplay',go,{once:true});
+ };
+ const deactivate=v=>{try{v.pause()}catch{}};
+ if('IntersectionObserver' in window){
+   const io=new IntersectionObserver(entries=>{
+     entries.forEach(entry=>entry.isIntersecting ? activate(entry.target) : deactivate(entry.target));
+   },{root:null,rootMargin:'300px 0px',threshold:.05});
+   videos.forEach(v=>io.observe(v));
+ }else{
+   videos.forEach(activate);
+ }
 }
 function renderTemplates(){
  const tabs=$('templateTabs'),list=$('templateList');
@@ -200,8 +215,8 @@ function renderTemplates(){
  list.innerHTML=filtered.map(({t,i})=>{
    const m=templateDemoMedia(i);
    let visual;
-   if(m.video) visual='<video class="templateDemoMedia" muted playsinline autoplay loop preload="metadata" src="'+esc(m.video)+'"></video>';
-   else visual='<div class="templateDemoFallback"><span>Loading real preview…</span></div>';
+   if(m.video) visual='<video class="templateDemoMedia" muted playsinline loop preload="none" data-src="'+esc(m.video)+'" poster="'+esc(m.photo||'')+'"></video>';
+   else visual='<div class="templateDemoFallback"><span>Real preview will load when visible</span></div>';
    return '<article class="templateCard '+(activeTemplate===t?'chosen':'')+'" onclick="runTemplate('+i+');event.stopPropagation()">'+
     '<div class="templateLive">'+visual+'<div class="templatePlay">▶</div><span class="templateLiveBadge">▶ PREVIEW · '+esc(t.speed)+'</span><div class="templateDemoOverlay"><b>'+esc(t.name)+'</b><span>'+esc(t.dur)+'s · '+esc(t.cat)+' · works with photo, video or mixed media</span></div></div>'+
     '<div class="templateCardBody"><div><b>'+esc(t.name)+'</b><span>'+esc(t.desc)+'</span></div><button type="button" class="primary" onclick="runTemplate('+i+');event.stopPropagation()">Use template</button></div></article>';
