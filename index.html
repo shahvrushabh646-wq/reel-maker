@@ -273,7 +273,8 @@ async function runTemplate(i){
  if(!selected.length){$('qc').textContent='QC: Add or import media first';return;}
  sequence=buildSequence();renderToken++;
  await new Promise(requestAnimationFrame);
- await draw(0);
+ const ok=await draw(0);
+ if(!ok){$('qc').textContent='QC: Template preview failed — selected media could not be loaded';return;}
  $('qc').textContent='QC: '+sequence.length+' scenes · '+activeTemplate.name+' · ready to play';
  playing=false;start();
 }
@@ -437,7 +438,8 @@ async function draw(t,captureFrame=false){
    if(activeTemplate.transition==='flash'&&local<.07){ctx.fillStyle='rgba(255,255,255,'+((.07-local)/.07*.35)+')';ctx.fillRect(0,0,c.width,c.height)}
    overlay(ctx,idx,scene.label);
    $('bar').style.width=(raw/dur*100)+'%';
- }catch(e){ctx.fillStyle='#111';ctx.fillRect(0,0,c.width,c.height);ctx.fillStyle='#ffcc80';ctx.font='40px Arial';ctx.textAlign='center';ctx.fillText('Media could not be previewed',540,900);ctx.font='28px Arial';ctx.fillText(a?.source||'Unknown source',540,960);ctx.textAlign='left'}
+ }catch(e){ctx.fillStyle='#111';ctx.fillRect(0,0,c.width,c.height);ctx.fillStyle='#ffcc80';ctx.font='40px Arial';ctx.textAlign='center';ctx.fillText('Media could not be previewed',540,900);ctx.font='28px Arial';ctx.fillText(a?.source||'Unknown source',540,960);ctx.textAlign='left';$('qc').textContent='QC: Media preview failed — '+String(e.message||e);return false}
+ return true;
 }
 async function ensureSelectedFontReady(){
  const family=String($('fontFamily')?.value||'Noto Sans').trim()||'Noto Sans';
@@ -460,7 +462,7 @@ async function ensureSelectedFontReady(){
  return family;
 }
 function overlay(ctx,idx,label){ctx.fillStyle='rgba(0,0,0,.34)';ctx.fillRect(0,0,1080,240);const ff=$('fontFamily')?.value||'Noto Sans';ctx.fillStyle='#fff';ctx.font=($('fontWeight')?.value||'700')+' 54px "'+ff+'",sans-serif';ctx.fillText('Festival of Bharat',50,104);ctx.font='600 34px "'+ff+'",sans-serif';ctx.fillText((idx+1)+' / '+(sequence.length||selected.length)+' · '+(label||''),50,168);const txt=$('captionText')?.value?.trim();if(txt){ctx.textAlign='center';ctx.font=($('fontWeight')?.value||'700')+' '+(($('fontSize')?.value||34)*2)+'px "'+ff+'",sans-serif';const y=$('captionPos').value==='top'?310:$('captionPos').value==='middle'?1000:1750;ctx.fillStyle='rgba(0,0,0,.48)';ctx.fillRect(50,y-86,980,116);ctx.fillStyle='#fff';ctx.fillText(txt,540,y);ctx.textAlign='left'}}
-function start(){if(playing)return;playing=true;started=performance.now();const f=async n=>{if(!playing)return;await draw((n-started)/1000);if(playing)raf=requestAnimationFrame(f)};raf=requestAnimationFrame(f)}
+function start(){if(playing)return;playing=true;started=performance.now();const f=async n=>{if(!playing)return;const ok=await draw((n-started)/1000);if(!ok){playing=false;cancelAnimationFrame(raf);return}if(playing)raf=requestAnimationFrame(f)};raf=requestAnimationFrame(f)}
 $('build').onclick=async()=>{
  if(!selected.length)autoSelect();
  if(!selected.length){$('qc').textContent='QC: Add or import media first';return false}
@@ -471,7 +473,8 @@ $('build').onclick=async()=>{
  openWorkspace('preview');
  await new Promise(requestAnimationFrame);
  try{
-   await draw(0);
+   const ok=await draw(0);
+   if(!ok)throw new Error('One or more selected media assets could not be loaded');
    $('qc').textContent='QC: '+sequence.length+' scenes · '+activeTemplate.name+' · '+$('duration').value+'s · READY';
    start();
    return true;
@@ -507,7 +510,7 @@ $('export').onclick=async()=>{
  renderToken++;
  openWorkspace('preview');
  await new Promise(requestAnimationFrame);
- try{await draw(0,true)}catch(e){$('qc').textContent='QC: First frame failed — '+String(e.message||e);return}
+ try{const firstOk=await draw(0,true);if(!firstOk)throw new Error('First frame media could not be loaded')}catch(e){$('qc').textContent='QC: First frame failed — '+String(e.message||e);return}
  const c=$('canvas');
  if(typeof c.captureStream!=='function'){$('qc').textContent='QC: Browser does not support canvas video capture';return}
  const stream=c.captureStream(30);
@@ -585,7 +588,8 @@ $('export').onclick=async()=>{
  while(playing){
    const elapsed=(performance.now()-startedAt)/1000;
    if(elapsed>=duration)break;
-   await draw(elapsed,true);
+   const frameOk=await draw(elapsed,true);
+   if(!frameOk){playing=false;cancelAnimationFrame(raf);$('qc').textContent='QC: Export stopped — a media frame could not be rendered';try{rec.stop()}catch{};return}
    $('qc').textContent='QC: Creating reel… '+Math.min(99,Math.round(elapsed/duration*100))+'%';
    await new Promise(requestAnimationFrame);
  }
