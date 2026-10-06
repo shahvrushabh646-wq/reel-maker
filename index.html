@@ -362,7 +362,25 @@ function renderTemplates(){
  $('templateTabs').innerHTML=cats.map(x=>{
    const count=x==='All'?150:50;
    return '<button class="tab '+(templateCat===x?'active':'')+'" onclick="setTemplateCat(&quot;'+x+'&quot;)">'+esc(x)+' <span style="opacity:.65">('+count+')</span></button>';
+ }).join('');
+ const query=String($('templateSearch')?.value||'').trim().toLowerCase();
+ const filtered=templates.map((t,i)=>({t,i})).filter(({t})=>{
+   const catOk=templateCat==='All'||t.speed===templateCat.toLowerCase();
+   const qOk=!query||String(t.name+' '+t.desc+' '+t.cat).toLowerCase().includes(query);
+   return catOk&&qOk;
  });
+ $('templateCount').textContent=filtered.length+' templates';
+ $('templateList').innerHTML=filtered.map(({t,i})=>{
+   const m=templateDemoMedia(i);
+   const media=m.video||m.photo;
+   let visual='';
+   if(m.video) visual='<video class="templateDemoMedia" muted playsinline autoplay loop preload="metadata" src="'+esc(m.video)+'"></video>';
+   else if(m.photo) visual='<img class="templateDemoMedia" src="'+esc(m.photo)+'" alt="">';
+   else visual='<div class="templateDemoFallback"><span>'+esc(t.name)+'</span></div>';
+   return '<article class="templateCard '+(activeTemplate===t?'chosen':'')+'">'+
+     '<div class="templateLive">'+visual+'<span class="templateLiveBadge">LIVE DEMO · '+esc(t.speed)+'</span><div class="templateDemoOverlay"><b>'+esc(t.name)+'</b><span>'+esc(t.dur)+'s · 50/50 media mix</span></div></div>'+
+     '<div class="templateCardBody"><div><b>'+esc(t.name)+'</b><span>'+esc(t.desc)+'</span></div><button class="primary" onclick="pickTemplate('+i+');openWorkspace(\'preview\');event.stopPropagation()">Use this template</button></div></article>';
+ }).join('') || '<div class="notice" style="grid-column:1/-1">No templates match this search.</div>';
 }
 function pickTemplate(i){
  activeTemplate=templates[i];$('templateName').textContent=activeTemplate.name;$('templateDesc').textContent=activeTemplate.desc;
