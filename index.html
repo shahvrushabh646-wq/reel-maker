@@ -23,7 +23,9 @@
 <div class="row"><label>Language <select id="captionLang" class="input"><option>English</option><option>Hindi</option><option>Gujarati</option><option>Marathi</option><option>Sanskrit</option><option>Tamil</option><option>Telugu</option><option>Bengali</option><option>Kannada</option><option>Malayalam</option><option>Punjabi</option></select></label>
 <label>Font <select id="fontFamily" class="input"><option>Noto Sans</option><option>Noto Sans Devanagari</option><option>Noto Sans Gujarati</option><option>Noto Sans Tamil</option><option>Noto Sans Telugu</option><option>Noto Sans Bengali</option><option>Noto Sans Kannada</option><option>Noto Sans Malayalam</option><option>Noto Sans Gurmukhi</option></select></label></div>
 <div class="row" style="margin-top:9px"><input id="captionText" class="input" style="flex:1" placeholder="Caption text"><select id="captionPos" class="input"><option value="bottom">Bottom</option><option value="middle">Middle</option><option value="top">Top</option></select></div>
-<div class="notice" style="margin-top:10px"><span id="fontPreview" style="font-size:25px">Festival of Bharat · जय श्री महाकाल · શુભ નમઃ શિવાય</span></div></section></section>
+<div class="row" style="margin-top:9px"><label>Weight <select id="fontWeight" class="input"><option value="400">Regular</option><option value="600">Semi Bold</option><option value="700" selected>Bold</option><option value="800">Extra Bold</option></select></label><label>Size <input id="fontSize" type="range" min="20" max="58" value="34"><span id="fontSizeVal">34px</span></label><button class="secondary" id="fontUploadBtn">Add custom font</button><input id="fontUpload" type="file" accept=".ttf,.otf,.woff,.woff2" hidden></div>
+<div class="notice" style="margin-top:10px"><b>Live font preview</b><br><span id="fontPreview" style="font-size:25px">Festival of Bharat · जय श्री महाकाल · શુભ નમઃ શિવાય</span></div>
+<div class="muted" style="margin-top:8px">Selected font, weight, size and caption position are rendered in the reel preview. Custom TTF/OTF/WOFF fonts stay available for this browser session.</div></section></section>
 </div>
 
 <aside id="preview" class="panel"><h2>Reel Builder</h2><div class="controls">
@@ -73,7 +75,7 @@ function autoSelect(){selected.length=0;const im=results.filter(x=>x.kind==='ima
 $('generate').onclick=()=>{if(!results.length)return $('form').requestSubmit();autoSelect();$('build').click();start()};
 function fit(ctx,s,cw,ch,z=1){const w=s.videoWidth||s.naturalWidth||s.width,h=s.videoHeight||s.naturalHeight||s.height;if(!w||!h)return false;const sc=Math.max(cw/w,ch/h)*z;ctx.drawImage(s,(cw-w*sc)/2,(ch-h*sc)/2,w*sc,h*sc);return true}
 function draw(t){const c=$('canvas'),ctx=c.getContext('2d');ctx.fillStyle='#050607';ctx.fillRect(0,0,c.width,c.height);if(!selected.length){ctx.fillStyle='#9aa4b0';ctx.font='24px Arial';ctx.fillText('Generate a reel',185,480);return}const dur=+$('duration').value,idx=Math.floor(t/Math.max(.7,dur/selected.length))%selected.length,a=selected[idx];let ok=false;if(a.kind==='video'){if(!activeVideo||activeVideo.dataset.id!==a.id){if(activeVideo)activeVideo.pause();activeVideo=document.createElement('video');activeVideo.dataset.id=a.id;activeVideo.src=a.playUrl;activeVideo.muted=true;activeVideo.playsInline=true;activeVideo.crossOrigin='anonymous';activeVideo.play().catch(()=>{})}ok=activeVideo.readyState>=2&&fit(ctx,activeVideo,c.width,c.height,1.02)}else{const im=new Image();im.crossOrigin='anonymous';im.onload=()=>{const c=$('canvas'),x=c.getContext('2d');x.fillStyle='#050607';x.fillRect(0,0,c.width,c.height);fit(x,im,c.width,c.height,1.03+.04*Math.sin(t));overlay(x,idx)};im.src=a.playUrl;return}overlay(ctx,idx);$('bar').style.width=((t%dur)/dur*100)+'%';}
-function overlay(ctx,idx){ctx.fillStyle='rgba(0,0,0,.34)';ctx.fillRect(0,0,540,120);const ff=$('fontFamily')?.value||'Noto Sans';ctx.fillStyle='#fff';ctx.font='700 27px "'+ff+'",sans-serif';ctx.fillText('Festival of Bharat',25,52);ctx.font='600 17px "'+ff+'",sans-serif';ctx.fillText((idx+1)+' / '+selected.length,25,84);const txt=$('captionText')?.value?.trim();if(txt){ctx.textAlign='center';ctx.font='700 34px "'+ff+'",sans-serif';const y=$('captionPos').value==='top'?155:$('captionPos').value==='middle'?500:875;ctx.fillStyle='rgba(0,0,0,.48)';ctx.fillRect(25,y-43,490,58);ctx.fillStyle='#fff';ctx.fillText(txt,270,y);ctx.textAlign='left'}}
+function overlay(ctx,idx){ctx.fillStyle='rgba(0,0,0,.34)';ctx.fillRect(0,0,540,120);const ff=$('fontFamily')?.value||'Noto Sans';ctx.fillStyle='#fff';ctx.font=($('fontWeight')?.value||'700')+' 27px "'+ff+'",sans-serif';ctx.fillText('Festival of Bharat',25,52);ctx.font='600 17px "'+ff+'",sans-serif';ctx.fillText((idx+1)+' / '+selected.length,25,84);const txt=$('captionText')?.value?.trim();if(txt){ctx.textAlign='center';ctx.font=($('fontWeight')?.value||'700')+' '+($('fontSize')?.value||34)+'px "'+ff+'",sans-serif';const y=$('captionPos').value==='top'?155:$('captionPos').value==='middle'?500:875;ctx.fillStyle='rgba(0,0,0,.48)';ctx.fillRect(25,y-43,490,58);ctx.fillStyle='#fff';ctx.fillText(txt,270,y);ctx.textAlign='left'}}
 function start(){if(playing)return;playing=true;started=performance.now();const f=n=>{if(!playing)return;draw((n-started)/1000);raf=requestAnimationFrame(f)};raf=requestAnimationFrame(f)}
 $('build').onclick=()=>{if(!selected.length)autoSelect();draw(0);$('qc').textContent='QC: '+selected.length+' media · '+activeTemplate.name+' · '+$('duration').value+'s · 9:16 preview ready'};
 $('play').onclick=start;$('stop').onclick=()=>{playing=false;cancelAnimationFrame(raf);if(activeVideo)activeVideo.pause()};
@@ -85,4 +87,15 @@ update();draw(0);
 </script></body></html><script>
 $('captionText').oninput=()=>draw(0);$('fontFamily').onchange=()=>{$('fontPreview').style.fontFamily='"'+$('fontFamily').value+'",sans-serif';draw(0)};$('captionPos').onchange=()=>draw(0);
 $('captionLang').onchange=()=>{const s={English:'Festival of Bharat',Hindi:'जय श्री महाकाल',Gujarati:'જય શ્રી મહાકાલ',Marathi:'जय श्री महाकाल',Sanskrit:'ॐ नमः शिवाय',Tamil:'ஓம் நமசிவாய',Telugu:'ఓం నమః శివాయ',Bengali:'জয় শ্রী মহাকাল',Kannada:'ಓಂ ನಮಃ ಶಿವಾಯ',Malayalam:'ഓം നമഃ ശിവായ',Punjabi:'ਜੈ ਸ਼੍ਰੀ ਮਹਾਕਾਲ'};$('captionText').value=s[$('captionLang').value]||'';$('fontPreview').textContent=$('captionText').value||'Festival of Bharat';draw(0)};
+</script>
+<script>
+$('fontWeight').onchange=()=>draw(0);
+$('fontSize').oninput=e=>{$('fontSizeVal').textContent=e.target.value+'px';draw(0)};
+$('fontUploadBtn').onclick=()=>$('fontUpload').click();
+$('fontUpload').onchange=async e=>{
+ const f=e.target.files[0]; if(!f)return;
+ try{const name='Custom-'+f.name.replace(/[^a-zA-Z0-9]/g,'-');const face=new FontFace(name,'url('+URL.createObjectURL(f)+')');await face.load();document.fonts.add(face);
+ const o=document.createElement('option');o.textContent=f.name;o.value=name;$('fontFamily').appendChild(o);$('fontFamily').value=name;$('fontPreview').style.fontFamily='"'+name+'",sans-serif';draw(0);
+ }catch(err){alert('Could not load this font. Please use a valid TTF, OTF, WOFF or WOFF2 file.')}
+};
 </script>
