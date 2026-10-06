@@ -46,25 +46,22 @@ const server=createServer(async(req,res)=>{
       const queries=[q, q+' devotional', q+' festival', q+' india'];
       const all=[];
       for(const term of queries){
-        const api=new URL('https://api.openverse.org/v1/audio/');
-        for(const [k,v] of [['q',term],['page_size','20'],['category','music'],['filter_dead','true'],['license','cc0,pdm,by,by-sa']]) api.searchParams.set(k,v);
-        let rr=await fetch(api,{headers:{'User-Agent':'Festival-of-Bharat-Reel-Maker/1.0'}});
-        let body=await rr.text();
-        let data=rr.ok?JSON.parse(body):null;
-        // If the preferred CC0/public-domain/attribution set is empty, retry broadly so the search still returns playable catalog tracks.
-        if(!data?.results?.length){
-          const fallback=new URL(api);
-          fallback.searchParams.delete('license');
-          fallback.searchParams.set('license_type','all-cc');
-          rr=await fetch(fallback,{headers:{'User-Agent':'Festival-of-Bharat-Reel-Maker/1.0'}});
-          body=await rr.text();
-          data=rr.ok?JSON.parse(body):null;
-        }
-        for(const x of (data?.results||[])){
-          if(x?.url && !all.some(y=>y.id===x.id)) all.push(x);
-        }
+        try{
+          const api=new URL('https://api.openverse.org/v1/audio/');
+          api.searchParams.set('q',term);
+          api.searchParams.set('page_size','50');
+          api.searchParams.set('page','1');
+          const rr=await fetch(api,{headers:{'User-Agent':'Festival-of-Bharat-Reel-Maker/1.0','Accept':'application/json'}});
+          const body=await rr.text();
+          if(!rr.ok) continue;
+          const data=JSON.parse(body);
+          for(const x of (data?.results||[])){
+            const audio=x.url||x.audio_url||x.file;
+            if(audio && !all.some(y=>y.id===x.id)) all.push({...x,url:audio});
+          }
+        }catch(e){ console.warn('Openverse query failed:',term,e.message); }
       }
-      return all.slice(0,40).map(x=>({
+      return all.slice(0,80).map(x=>({
         id:'openverse-'+x.id,name:x.title||'Untitled audio',
         artist_name:x.creator||'Unknown creator',duration:Math.round((+x.duration||0)/1000)||0,
         audio:'/proxy?url='+encodeURIComponent(x.url),original_audio:x.url,
