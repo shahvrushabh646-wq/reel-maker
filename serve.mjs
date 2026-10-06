@@ -30,7 +30,7 @@ const server=createServer(async(req,res)=>{
     try{
       await writeFile(input,Buffer.concat(chunks));
       await new Promise((resolveDone,reject)=>{
-        const p=spawn(ffmpegPath,['-y','-i',input,'-c:v','libx264','-preset','veryfast','-profile:v','high','-pix_fmt','yuv420p','-r','30','-movflags','+faststart','-c:a','aac','-b:a','192k',output]);
+        const p=spawn(ffmpegPath,['-y','-i',input,'-map','0:v:0','-map','0:a:0?','-c:v','libx264','-preset','veryfast','-profile:v','high','-pix_fmt','yuv420p','-r','30','-movflags','+faststart','-c:a','aac','-b:a','192k',output]);
         let err=''; p.stderr.on('data',d=>{err+=d.toString()}); p.on('error',reject);
         p.on('close',code=>code===0?resolveDone():reject(new Error(err.slice(-2000)||'FFmpeg conversion failed')));
       });
