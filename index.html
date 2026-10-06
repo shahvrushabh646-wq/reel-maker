@@ -279,7 +279,7 @@ function loadImage(url){
    const urls=[url].filter(Boolean); let n=0;
    const attempt=()=>{
      if(n>=urls.length){reject(new Error('image load failed'));return}
-     const im=new Image(); im.decoding='async';
+     const im=new Image(); im.decoding='async'; im.referrerPolicy='no-referrer';
      im.onload=()=>resolve(im);
      im.onerror=()=>{n++;attempt()};
      im.src=urls[n++];
@@ -294,7 +294,7 @@ function loadVideo(a){
    const attempt=()=>{
      if(n>=urls.length){reject(new Error('video load failed'));return}
      const v=document.createElement('video');
-     v.src=urls[n++]; v.muted=true; v.defaultMuted=true; v.playsInline=true; v.preload='auto';
+     v.src=urls[n++]; v.muted=true; v.defaultMuted=true; v.playsInline=true; v.preload='auto'; v.referrerPolicy='no-referrer';
      const ok=()=>{if(!settled){settled=true;resolve(v)}};
      const fail=()=>{v.removeAttribute('src');v.load();attempt()};
      v.addEventListener('loadeddata',ok,{once:true});
