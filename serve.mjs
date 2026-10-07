@@ -29,7 +29,8 @@ const server=createServer(async(req,res)=>{
       const upstream=await fetch(target,{
         headers:{
           'User-Agent':'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/154 Safari/537.36',
-          'Accept':'image/avif,image/webp,image/apng,image/svg+xml,image/*,video/*,*/*;q=0.8'
+          'Accept':'image/avif,image/webp,image/apng,image/svg+xml,image/*,video/*,*/*;q=0.8',
+          ...(req.headers.range?{'Range':req.headers.range}:{})
         },
         redirect:'follow'
       });
@@ -37,7 +38,7 @@ const server=createServer(async(req,res)=>{
       const type=upstream.headers.get('content-type')||'application/octet-stream';
       const body=Buffer.from(await upstream.arrayBuffer());
       if(!body.length)return send(res,502,{'Content-Type':'application/json'},JSON.stringify({error:'Empty upstream media'}));
-      return send(res,200,{'Content-Type':type,'Content-Length':body.length,'Cache-Control':'public,max-age=300','Access-Control-Allow-Origin':'*','Access-Control-Expose-Headers':'Content-Length, Content-Type'},body);
+      return send(res,upstream.status,{'Content-Type':type,'Content-Length':body.length,'Cache-Control':'public,max-age=300','Access-Control-Allow-Origin':'*','Access-Control-Expose-Headers':'Content-Length, Content-Type, Content-Range, Accept-Ranges','Accept-Ranges':'bytes',...(upstream.headers.get('content-range')?{'Content-Range':upstream.headers.get('content-range')}:{})},body);
     }catch(e){
       return send(res,502,{'Content-Type':'application/json'},JSON.stringify({error:'Media proxy failed',detail:String(e.message||e)}));
     }
