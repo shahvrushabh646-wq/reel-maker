@@ -400,6 +400,20 @@ function loadVideo(a){
  p.catch(()=>videoCache.delete(a.id));
  return p;
 }
+async function validateSequenceMedia(){
+ const unique=[];
+ const seen=new Set();
+ for(const scene of sequence){
+   const a=scene?.media;
+   if(!a||seen.has(a.id))continue;
+   seen.add(a.id); unique.push(a);
+ }
+ for(const a of unique){
+   if(a.kind==='video') await loadVideo(a);
+   else await loadImage(a.playUrl||a.url||a.thumbPlay);
+ }
+ return true;
+}
 function sceneAt(t){
  if(!sequence.length)sequence=buildSequence();
  const dur=+$('duration').value, n=sequence.length, raw=((t%dur)+dur)%dur, slot=dur/n, idx=Math.min(n-1,Math.floor(raw/slot)), local=(raw-idx*slot)/slot;
@@ -619,9 +633,9 @@ $('export').onclick=async()=>{
    return;
  }
  renderToken++;
- openWorkspace('preview');
- await new Promise(requestAnimationFrame);
- try{const firstOk=await draw(0,true);if(!firstOk)throw new Error('First frame media could not be loaded')}catch(e){$('qc').textContent='QC: First frame failed — '+String(e.message||e);return}
+ openWorkspace('preview',{skipRender:true});
+ await new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve)));
+ try{await validateSequenceMedia();const firstOk=await draw(0,true);if(!firstOk)throw new Error('First frame media could not be loaded')}catch(e){$('qc').textContent='QC: First frame failed — '+String(e.message||e);return}
  const c=$('canvas');
  if(typeof c.captureStream!=='function'){$('qc').textContent='QC: Browser does not support canvas video capture';return}
  const stream=c.captureStream(30);
