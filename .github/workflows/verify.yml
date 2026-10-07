@@ -14,5 +14,7 @@ jobs:
           node-version: 20
       - run: npm install
       - run: node --check serve.mjs
-      - run: node -e "const fs=require('fs');const h=fs.readFileSync('index.html','utf8');const s=[...h.matchAll(/<script(?:\\s[^>]*)?>([\\s\\S]*?)<\\/script>/gi)].map(m=>m[1]).filter(x=>x.trim());fs.writeFileSync('/tmp/app-scripts.js',s.join('\\n'));"
-      - run: npx --yes acorn --ecma2024 --locations /tmp/app-scripts.js
+      - run: node -e "const fs=require('fs');const h=fs.readFileSync('index.html','utf8');const s=[...h.matchAll(/<script(?:\\s[^>]*)?>([\\s\\S]*?)<\\/script>/gi)].map(m=>m[1]).filter(x=>x.trim());s.forEach((x,i)=>fs.writeFileSync('/tmp/app-script-'+i+'.js',x));console.log('scripts',s.map((x,i)=>i+':'+x.split('\\n').length).join(' '));"
+      - run: node --check /tmp/app-script-0.js
+      - run: node --check /tmp/app-script-1.js
+      - run: node --check /tmp/app-script-2.js
