@@ -252,7 +252,7 @@ function pickTemplate(i){
  $('scenePlan').innerHTML=activeTemplate.scenes.map(s=>'<span class="scene-chip">'+esc(s[1])+'</span>').join('');
  sequence=buildSequence();renderTemplates();update();renderToken++;draw(0);
 }
-async function runTemplate(i){
+async async function runTemplate(i){
  if(!templates[i])return false;
  pickTemplate(i);
  openWorkspace('preview');
