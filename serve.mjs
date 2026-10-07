@@ -37,7 +37,7 @@ const server=createServer(async(req,res)=>{
       const type=upstream.headers.get('content-type')||'application/octet-stream';
       const body=Buffer.from(await upstream.arrayBuffer());
       if(!body.length)return send(res,502,{'Content-Type':'application/json'},JSON.stringify({error:'Empty upstream media'}));
-      return send(res,200,{'Content-Type':type,'Content-Length':body.length,'Cache-Control':'public,max-age=300'},body);
+      return send(res,200,{'Content-Type':type,'Content-Length':body.length,'Cache-Control':'public,max-age=300','Access-Control-Allow-Origin':'*','Access-Control-Expose-Headers':'Content-Length, Content-Type'},body);
     }catch(e){
       return send(res,502,{'Content-Type':'application/json'},JSON.stringify({error:'Media proxy failed',detail:String(e.message||e)}));
     }
