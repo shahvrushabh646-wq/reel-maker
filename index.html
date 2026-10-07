@@ -166,16 +166,11 @@ const BUILTIN_TEMPLATE_VIDEOS=[
  'https://commons.wikimedia.org/wiki/Special:Redirect/file/Sri_Sri_Iswar_Madan_Mohan_Jew_-_Temple_Aarti.webm'
 ];
 function templateDemoMedia(i){
- // Template demos must use the user's SELECTED media, not unrelated search results.
- // If only photos are selected, show photos. If only videos are selected, show videos.
- // If both are selected, alternate between the actual selected assets.
- const imgs=selected.filter(x=>x.kind==='image');
- const vids=selected.filter(x=>x.kind==='video');
- const fallbackImg=imgs.length?imgs[i%imgs.length]:null;
- const fallbackVid=vids.length?vids[i%vids.length]:null;
- const video=fallbackVid?.playUrl||fallbackVid?.url||proxy(BUILTIN_TEMPLATE_VIDEOS[i%BUILTIN_TEMPLATE_VIDEOS.length]);
- const photo=fallbackImg?.thumbPlay||fallbackImg?.playUrl||fallbackImg?.url||'';
- return {photo,video,kind:'video'};
+ // Template demos are independent of user media selection.
+ // The demo is always a real playable video; selected media is used only
+ // when the user actually runs the template.
+ const video=proxy(BUILTIN_TEMPLATE_VIDEOS[i%BUILTIN_TEMPLATE_VIDEOS.length]);
+ return {photo:'',video,kind:'video'};
 }
 function playTemplateVideos(root=document){
  const videos=[...root.querySelectorAll('video.templateDemoMedia, video.templatePreviewVideo')];
