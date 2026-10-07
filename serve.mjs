@@ -23,24 +23,43 @@ const server=createServer(async(req,res)=>{
     catch(e){ return send(res,500,{'Content-Type':'text/plain'},'Could not read index.html'); }
   }
   if(u.pathname==='/proxy' && (req.method==='GET'||req.method==='HEAD')){
-    const target=u.searchParams.get('url')||'';
-    if(!(target.startsWith('http://') || target.startsWith('https://'))) return send(res,400,{'Content-Type':'application/json'},JSON.stringify({error:'Invalid media URL'}));
+    const target=u.searchParams.get('url');
+    if(!target) return send(res,400,{'Content-Type':'text/plain'},'Missing url');
     try{
-      const upstream=await fetch(target,{
-        headers:{
-          'User-Agent':'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/154 Safari/537.36',
-          'Accept':'image/avif,image/webp,image/apng,image/svg+xml,image/*,video/*,*/*;q=0.8',
-          ...(req.headers.range?{'Range':req.headers.range}:{})
-        },
-        redirect:'follow'
-      });
-      if(!upstream.ok) return send(res,upstream.status,{'Content-Type':'application/json'},JSON.stringify({error:'Upstream media HTTP '+upstream.status}));
-      const type=upstream.headers.get('content-type')||'application/octet-stream';
-      const body=Buffer.from(await upstream.arrayBuffer());
-      if(!body.length)return send(res,502,{'Content-Type':'application/json'},JSON.stringify({error:'Empty upstream media'}));
-      return send(res,upstream.status,{'Content-Type':type,'Content-Length':body.length,'Cache-Control':'public,max-age=300','Access-Control-Allow-Origin':'*','Access-Control-Expose-Headers':'Content-Length, Content-Type, Content-Range, Accept-Ranges','Accept-Ranges':'bytes',...(upstream.headers.get('content-range')?{'Content-Range':upstream.headers.get('content-range')}:{})},body);
+      const t=new URL(target);
+      if(!['http:','https:'].includes(t.protocol)) return send(res,400,{'Content-Type':'text/plain'},'Unsupported protocol');
+      const headers={
+        'User-Agent':'Festival-of-Bharat-Reel-Maker/1.0',
+        'Accept':'image/avif,image/webp,image/apng,image/svg+xml,image/*,video/*,*/*;q=0.8'
+      };
+      if(req.headers.range) headers.Range=req.headers.range;
+      const r=await fetch(t,{redirect:'follow',headers});
+      if(!r.ok) return send(res,r.status,{'Content-Type':'text/plain'},'Upstream '+r.status);
+      const h={
+        'Access-Control-Allow-Origin':'*',
+        'Access-Control-Expose-Headers':'Accept-Ranges, Content-Length, Content-Range, Content-Type',
+        'Accept-Ranges':r.headers.get('accept-ranges')||'bytes',
+        'Cache-Control':'public, max-age=3600',
+        'Content-Type':r.headers.get('content-type')||'application/octet-stream'
+      };
+      for(const x of ['content-length','content-range']){
+        const v=r.headers.get(x);
+        if(v) h[x==='content-length'?'Content-Length':'Content-Range']=v;
+      }
+      const status=r.status===206?206:200;
+      if(req.method==='HEAD') return send(res,status,h);
+      if(!r.body) return send(res,502,{'Content-Type':'text/plain'},'Upstream media body missing');
+      res.writeHead(status,h);
+      const reader=r.body.getReader();
+      req.on('close',()=>{try{reader.cancel()}catch{}});
+      while(true){
+        const {done,value}=await reader.read();
+        if(done) break;
+        if(!res.write(Buffer.from(value))) await new Promise(resolve=>res.once('drain',resolve));
+      }
+      return res.end();
     }catch(e){
-      return send(res,502,{'Content-Type':'application/json'},JSON.stringify({error:'Media proxy failed',detail:String(e.message||e)}));
+      return send(res,502,{'Content-Type':'text/plain'},'Proxy failed: '+String(e.message||e));
     }
   }
   if(u.pathname==='/convert-mp4' && req.method==='POST'){
