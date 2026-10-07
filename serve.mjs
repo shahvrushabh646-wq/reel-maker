@@ -290,18 +290,6 @@ const server=createServer(async(req,res)=>{
       return send(res,200,{'Content-Type':'application/json','Cache-Control':'no-store'},body);
     }catch(e){return send(res,502,{'Content-Type':'application/json'},JSON.stringify({error:e.message}));}
   }
-  if(u.pathname==='/proxy'){
-    const target=u.searchParams.get('url'); if(!target) return send(res,400,{'Content-Type':'text/plain'},'Missing url');
-    try{
-      const t=new URL(target); if(!['http:','https:'].includes(t.protocol)) return send(res,400,{'Content-Type':'text/plain'},'Unsupported protocol');
-      const headers={'User-Agent':'Festival-of-Bharat-Reel-Maker/1.0'}; if(req.headers.range) headers.Range=req.headers.range;
-      const r=await fetch(t,{redirect:'follow',headers}); if(!r.ok||!r.body) return send(res,r.status,{'Content-Type':'text/plain'},'Upstream '+r.status);
-      const h={'Access-Control-Allow-Origin':'*','Access-Control-Expose-Headers':'Accept-Ranges, Content-Length, Content-Range, Content-Type','Accept-Ranges':r.headers.get('accept-ranges')||'bytes','Cache-Control':'public, max-age=3600','Content-Type':r.headers.get('content-type')||'application/octet-stream'};
-      for(const x of ['content-length','content-range']){const v=r.headers.get(x);if(v)h[x==='content-length'?'Content-Length':'Content-Range']=v}
-      res.writeHead(r.status===206?206:200,h); const reader=r.body.getReader(); while(true){const {done,value}=await reader.read();if(done)break;res.write(Buffer.from(value))} res.end();
-    }catch(e){send(res,502,{'Content-Type':'text/plain'},'Proxy failed: '+e.message)}
-    return;
-  }
   send(res,404,{'Content-Type':'text/plain'},'Not found');
 });
 const port=Number(process.env.PORT||4173);
