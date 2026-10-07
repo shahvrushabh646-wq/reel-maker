@@ -403,12 +403,16 @@ function sceneAt(t){
 async function draw(t,captureFrame=false){
  const token=renderToken,c=$('canvas'),ctx=c.getContext('2d');ctx.fillStyle='#050607';ctx.fillRect(0,0,c.width,c.height);
  await ensureSelectedFontReady();
- if(!selected.length){ctx.fillStyle='#9aa4b0';ctx.font='48px Arial';ctx.textAlign='center';ctx.fillText('Select media to build preview',540,960);ctx.textAlign='left';return}
+ if(!selected.length){ctx.fillStyle='#9aa4b0';ctx.font='48px Arial';ctx.textAlign='center';ctx.fillText('Select media to build preview',540,960);ctx.textAlign='left';return true}
  const {scene,idx,local,slot}=sceneAt(t),a=scene.media;
+ if(!a){$('qc').textContent='QC: No media assigned to scene '+String(idx+1);return false}
  try{
    const isVideo=a.kind==='video';
    let media=isVideo?await loadVideo(a):await loadImage(a.playUrl||a.url||a.thumbPlay);
-   if(token!==renderToken)return;
+   if(token!==renderToken){
+     // A newer render superseded this one; do not turn that normal race into a media failure.
+     return false;
+   }
    const speed=$('speed').value,fast=speed.includes('Fast'),slow=speed.includes('Slow');
    let z=1.02+.07*local,px=0,py=0,rot=0;
    if(activeTemplate.motion==='photo-cinema'||!isVideo){
@@ -446,7 +450,15 @@ async function draw(t,captureFrame=false){
    if(activeTemplate.transition==='flash'&&local<.07){ctx.fillStyle='rgba(255,255,255,'+((.07-local)/.07*.35)+')';ctx.fillRect(0,0,c.width,c.height)}
    overlay(ctx,idx,scene.label);
    $('bar').style.width=(raw/dur*100)+'%';
- }catch(e){ctx.fillStyle='#111';ctx.fillRect(0,0,c.width,c.height);ctx.fillStyle='#ffcc80';ctx.font='40px Arial';ctx.textAlign='center';ctx.fillText('Media could not be previewed',540,900);ctx.font='28px Arial';ctx.fillText(a?.source||'Unknown source',540,960);ctx.textAlign='left';$('qc').textContent='QC: Media preview failed — '+String(e.message||e);return false}
+ }catch(e){
+   ctx.fillStyle='#111';ctx.fillRect(0,0,c.width,c.height);
+   ctx.fillStyle='#ffcc80';ctx.font='40px Arial';ctx.textAlign='center';ctx.fillText('Media could not be previewed',540,900);
+   ctx.font='28px Arial';ctx.fillText(a?.source||'Unknown source',540,960);ctx.textAlign='left';
+   const detail=String(e?.message||e||'Unknown media error');
+   $('qc').textContent='QC: Media preview failed — '+detail.slice(0,320);
+   console.error('FOB media render failure', {asset:a, error:e});
+   return false;
+ }
  return true;
 }
 async function ensureSelectedFontReady(){
@@ -564,7 +576,10 @@ $('build').onclick=async()=>{
    await new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve)));
    // Render and validate the first actual frame before starting playback.
    const ok=await draw(0,true);
-   if(!ok)throw new Error('The selected photo/video could not be rendered');
+   if(!ok){
+     // draw() has already written the exact media/render failure to QC.
+     return false;
+   }
    $('qc').textContent='QC: Reel built · '+sequence.length+' scenes · '+activeTemplate.name+' · READY';
    start();
    return true;
