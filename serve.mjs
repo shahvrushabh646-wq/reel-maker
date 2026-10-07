@@ -134,7 +134,7 @@ const server=createServer(async(req,res)=>{
           const kind=mime.startsWith('image/')?'image':mime.startsWith('video/')?'video':'';
           if(kind!==targetKind||!z?.url||seenPages.has(x.pageid))continue;
           seenPages.add(x.pageid);
-          collected.push({id:(kind==='video'?'wmv':'wm')+x.pageid,title:x.title||('Wikimedia Commons '+kind),source:'Wikimedia Commons',url:z.url,thumb:z.thumburl||'',kind});
+          collected.push({id:(kind==='video'?'wmv':'wm')+x.pageid,title:x.title||('Wikimedia Commons '+kind),source:'Wikimedia Commons',url:(kind==='image'&&z.thumburl)?z.thumburl:z.url,originalUrl:z.url,thumb:z.thumburl||z.url||'',kind});
           if(collected.length>=maxItems)break;
         }
         continuation=d?.continue?.gsrcontinue||null;
