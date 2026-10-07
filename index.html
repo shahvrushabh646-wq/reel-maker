@@ -351,7 +351,7 @@ function playableUrl(url){
  if(!url)return '';
  const s=String(url);
  if(s.startsWith('blob:')||s.startsWith('data:')||s.startsWith('/')||s.startsWith(location.origin))return s;
- if(/^https?:\\/\\//i.test(s))return '/proxy?url='+encodeURIComponent(s);
+ if(s.startsWith('http://')||s.startsWith('https://'))return '/proxy?url='+encodeURIComponent(s);
  return s;
 }
 function mediaCandidates(a){
