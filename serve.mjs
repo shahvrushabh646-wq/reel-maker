@@ -22,7 +22,7 @@ const server=createServer(async(req,res)=>{
     try { const html=await readFile(resolve(root,'index.html'),'utf8'); return send(res,200,{'Content-Type':'text/html; charset=utf-8','Cache-Control':'no-store'},html); }
     catch(e){ return send(res,500,{'Content-Type':'text/plain'},'Could not read index.html'); }
   }
-  if(u.pathname==='/proxy' && req.method==='GET'){
+  if(u.pathname==='/proxy' && (req.method==='GET'||req.method==='HEAD')){
     const target=u.searchParams.get('url')||'';
     if(!(target.startsWith('http://') || target.startsWith('https://'))) return send(res,400,{'Content-Type':'application/json'},JSON.stringify({error:'Invalid media URL'}));
     try{
