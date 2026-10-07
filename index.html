@@ -443,7 +443,70 @@ async function ensureSelectedFontReady(){
  }
  return family;
 }
-function overlay(ctx,idx,label){ctx.fillStyle='rgba(0,0,0,.34)';ctx.fillRect(0,0,1080,240);const ff=$('fontFamily')?.value||'Noto Sans';ctx.fillStyle='#fff';ctx.font=($('fontWeight')?.value||'700')+' 54px "'+ff+'",sans-serif';ctx.fillText('Festival of Bharat',50,104);ctx.font='600 34px "'+ff+'",sans-serif';ctx.fillText((idx+1)+' / '+(sequence.length||selected.length)+' · '+(label||''),50,168);const txt=$('captionText')?.value?.trim();if(txt){ctx.textAlign='center';ctx.font=($('fontWeight')?.value||'700')+' '+(($('fontSize')?.value||34)*2)+'px "'+ff+'",sans-serif';const y=$('captionPos').value==='top'?310:$('captionPos').value==='middle'?1000:1750;ctx.fillStyle='rgba(0,0,0,.48)';ctx.fillRect(50,y-86,980,116);ctx.fillStyle='#fff';ctx.fillText(txt,540,y);ctx.textAlign='left'}}
+function overlay(ctx,idx,label){
+ const design=String(activeTemplate?.design||'Minimal Type');
+ const ff=$('fontFamily')?.value||'Noto Sans';
+ const fw=$('fontWeight')?.value||'700';
+ const total=sequence.length||selected.length;
+ const txt=$('captionText')?.value?.trim();
+ ctx.save();
+ ctx.textBaseline='middle';
+ // Every template family gets a genuinely different composition, not just a different name.
+ const isEditorial=['Editorial Split','Magazine Cover','News Flash','Vertical Label','Travel Diary'].includes(design);
+ const isFrame=['Polaroid Stack','Film Strip','Vintage Frame','Sacred Frame','Classic Cinema'].includes(design);
+ const isBold=['Bold Statement','Kinetic Caption','Neon Edge','Gradient Poster','Dynamic Crop'].includes(design);
+ const isJournal=['Soft Journal','Retro Analog','Photo Dump','Doodle Notes','Memory Album'].includes(design);
+ const isGrid=['Collage Grid','Modern Blocks','Split Screen','Festival Cards','Type + Image'].includes(design);
+ const isSerif=['Luxury Serif','Clean Quote','Black White','Ripped Paper','Minimal Type'].includes(design);
+ const isVertical=design==='Vertical Label';
+ const isMagazine=design==='Magazine Cover';
+ if(isEditorial){
+   ctx.fillStyle='rgba(0,0,0,.62)';ctx.fillRect(0,0,1080,205);
+   ctx.fillStyle='#fff';ctx.fillRect(50,44,120,5);
+   ctx.fillStyle='#fff';ctx.font=fw+' 48px "'+ff+'",sans-serif';ctx.fillText('Festival of Bharat',50,92);
+   ctx.font='600 25px "'+ff+'",sans-serif';ctx.fillStyle='rgba(255,255,255,.78)';ctx.fillText((idx+1)+' / '+total+'  ·  '+(label||''),50,145);
+   if(isMagazine){ctx.font='700 22px "'+ff+'",sans-serif';ctx.fillStyle='rgba(255,255,255,.72)';ctx.fillText('CULTURE · HERITAGE · INDIA',50,180);}
+ }else if(isFrame){
+   ctx.strokeStyle='rgba(255,255,255,.9)';ctx.lineWidth=12;ctx.strokeRect(28,28,1024,1924);
+   ctx.fillStyle='rgba(0,0,0,.58)';ctx.fillRect(48,1640,984,220);
+   ctx.fillStyle='#fff';ctx.font=fw+' 46px "'+ff+'",sans-serif';ctx.fillText('Festival of Bharat',78,1700);
+   ctx.font='600 27px "'+ff+'",sans-serif';ctx.fillStyle='rgba(255,255,255,.78)';ctx.fillText((idx+1)+' / '+total+' · '+(label||''),78,1760);
+ }else if(isBold){
+   ctx.fillStyle='rgba(0,0,0,.48)';ctx.fillRect(0,0,1080,170);
+   ctx.fillStyle='#fff';ctx.font='900 58px "'+ff+'",sans-serif';ctx.fillText((idx+1)+'  '+(label||'MOMENT'),48,88);
+   ctx.fillStyle='rgba(255,255,255,.9)';ctx.fillRect(48,128,250,8);
+   if(design==='Neon Edge'){ctx.strokeStyle='rgba(255,255,255,.75)';ctx.lineWidth=5;ctx.strokeRect(22,22,1036,1936);}
+ }else if(isJournal){
+   ctx.fillStyle='rgba(245,240,230,.92)';ctx.fillRect(45,45,990,185);
+   ctx.fillStyle='#171717';ctx.font='700 42px "'+ff+'",sans-serif';ctx.fillText('Festival of Bharat',72,105);
+   ctx.font='600 24px "'+ff+'",sans-serif';ctx.fillStyle='rgba(23,23,23,.68)';ctx.fillText((idx+1)+'  ·  '+(label||'')+'  ·  '+design.toUpperCase(),72,158);
+   ctx.strokeStyle='rgba(23,23,23,.28)';ctx.lineWidth=2;ctx.beginPath();ctx.moveTo(72,195);ctx.lineTo(1005,195);ctx.stroke();
+ }else if(isGrid){
+   ctx.fillStyle='rgba(0,0,0,.58)';ctx.fillRect(35,35,1010,190);
+   ctx.fillStyle='#fff';ctx.font='800 44px "'+ff+'",sans-serif';ctx.fillText('Festival of Bharat',62,95);
+   ctx.font='600 26px "'+ff+'",sans-serif';ctx.fillText((idx+1)+' / '+total+' · '+(label||''),62,148);
+   ctx.strokeStyle='rgba(255,255,255,.7)';ctx.lineWidth=3;ctx.strokeRect(35,35,1010,190);
+   ctx.beginPath();ctx.moveTo(540,35);ctx.lineTo(540,225);ctx.stroke();
+ }else{
+   ctx.fillStyle='rgba(0,0,0,.38)';ctx.fillRect(0,0,1080,220);
+   ctx.fillStyle='#fff';ctx.font=fw+' 54px "'+ff+'",sans-serif';ctx.fillText('Festival of Bharat',50,92);
+   ctx.font='600 32px "'+ff+'",sans-serif';ctx.fillText((idx+1)+' / '+total+' · '+(label||''),50,155);
+   if(isSerif){ctx.strokeStyle='rgba(255,255,255,.65)';ctx.lineWidth=2;ctx.beginPath();ctx.moveTo(50,190);ctx.lineTo(1030,190);ctx.stroke();}
+ }
+ if(isVertical){
+   ctx.save();ctx.translate(1015,980);ctx.rotate(-Math.PI/2);ctx.fillStyle='#fff';ctx.font='800 30px "'+ff+'",sans-serif';ctx.fillText('FESTIVAL OF BHARAT',0,0);ctx.restore();
+ }
+ if(txt){
+   ctx.textAlign='center';ctx.font=fw+' '+(($('fontSize')?.value||34)*2)+'px "'+ff+'",sans-serif';
+   const y=$('captionPos').value==='top'?310:$('captionPos').value==='middle'?1000:1750;
+   const h=116;
+   if(isBold){ctx.fillStyle='rgba(0,0,0,.68)';ctx.fillRect(35,y-86,1010,h);}
+   else if(isJournal){ctx.fillStyle='rgba(245,240,230,.92)';ctx.fillRect(55,y-86,970,h);}
+   else{ctx.fillStyle='rgba(0,0,0,.48)';ctx.fillRect(50,y-86,980,h);}
+   ctx.fillStyle=isJournal?'#171717':'#fff';ctx.fillText(txt,540,y);ctx.textAlign='left';
+ }
+ ctx.restore();
+}
 function start(){if(playing)return;playing=true;started=performance.now();const f=async n=>{if(!playing)return;const ok=await draw((n-started)/1000);if(!ok){playing=false;cancelAnimationFrame(raf);return}if(playing)raf=requestAnimationFrame(f)};raf=requestAnimationFrame(f)}
 $('build').onclick=async()=>{
  if(!selected.length){$('qc').textContent='QC: Select media first — use Select on media cards or Select all';return false}
