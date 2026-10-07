@@ -200,16 +200,33 @@ function toggleTemplateDemo(event,button){
  }
 }
 window.toggleTemplateDemo=toggleTemplateDemo;
-function previewTemplate(i,event){
+async function previewTemplate(i,event){
  event?.stopPropagation();
+ if(!templates[Number(i)])return false;
+ pickTemplate(Number(i));
+ if(selected.length){
+   sequence=buildSequence();
+   renderToken++;
+   openWorkspace('preview');
+   try{
+     const ok=await draw(0);
+     if(!ok)throw new Error('Selected media could not be rendered with this template');
+     $('qc').textContent='QC: Preview · '+activeTemplate.name+' · '+sequence.length+' scenes';
+     playing=false;
+     start();
+     return true;
+   }catch(e){
+     $('qc').textContent='QC: Template preview failed — '+String(e.message||e);
+     return false;
+   }
+ }
+ // No user media yet: keep the lightweight real-video demo as a visual reference.
  const card=document.querySelector('#templateList .templateCard[data-template-index="'+Number(i)+'"]');
- if(!card)return false;
- const v=card.querySelector('video.templateDemoMedia');
- if(!v)return false;
+ const v=card?.querySelector('video.templateDemoMedia');
+ if(!v)return true;
  document.querySelectorAll('#templateList video.templateDemoMedia').forEach(x=>{if(x!==v){try{x.pause()}catch{} }});
  if(!v.src){v.src=v.dataset.src||'';v.preload='auto';}
- v.muted=true;v.defaultMuted=true;v.playsInline=true;v.controls=true;
- v.currentTime=0;
+ v.muted=true;v.defaultMuted=true;v.playsInline=true;v.controls=true;v.currentTime=0;
  const p=v.play();
  if(p&&p.catch)p.catch(()=>{ $('qc').textContent='QC: Template demo could not autoplay — use the video play control'; });
  return true;
