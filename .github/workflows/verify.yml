@@ -15,4 +15,4 @@ jobs:
       - run: npm install
       - run: node --check serve.mjs
       - run: node -e "const fs=require('fs');const h=fs.readFileSync('index.html','utf8');const s=[...h.matchAll(/<script(?:\\s[^>]*)?>([\\s\\S]*?)<\\/script>/gi)].map(m=>m[1]).filter(x=>x.trim());fs.writeFileSync('/tmp/app-scripts.js',s.join('\\n'));"
-      - run: node --check /tmp/app-scripts.js
+      - run: npx --yes acorn --ecma2024 --locations /tmp/app-scripts.js
