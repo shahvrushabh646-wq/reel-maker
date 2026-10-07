@@ -1,6 +1,6 @@
 services:
   - type: web
-    name: festival-of-bharat-reel-maker
+    name: reel-maker
     runtime: node
     plan: free
     buildCommand: npm install
