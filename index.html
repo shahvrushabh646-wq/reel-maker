@@ -118,8 +118,8 @@ function update(){ $('photoCount').textContent=results.filter(x=>x.kind==='image
 let mediaTab='photos';
 function setMediaTab(tab){mediaTab=tab;render()}
 window.setMediaTab=setMediaTab;
-function toggle(i){const item=results[Number(i)];if(!item)return false;const at=selected.findIndex(x=>x.id===item.id);if(at>=0)selected.splice(at,1);else selected.push(item);sequence=buildSequence();renderToken++;render();draw(0);return true;}window.toggle=toggle;
-function render(){const visible=results.filter(x=>mediaTab==='all'||(mediaTab==='photos'&&x.kind==='image')||(mediaTab==='videos'&&x.kind==='video'));$('grid').innerHTML=visible.map(x=>{const i=results.indexOf(x);const isSelected=selected.some(a=>a.id===x.id);return '<div class="card">'+(x.kind==='video'?'<video src="'+esc(x.playUrl||x.url)+'" poster="'+esc(x.thumbPlay||'')+'" muted playsinline preload="metadata" controls></video>':'<img src="'+esc(x.thumbPlay||x.url)+'" loading="lazy">')+'<b title="'+esc(x.title)+'">'+esc(x.title||'Untitled')+'</b><span class="muted">'+esc(x.source||'')+'</span><div class="actions"><button type="button" class="'+(isSelected?'sel':'')+'" onclick="event.stopPropagation();toggle('+i+')">'+(isSelected?'✓ Selected':'Select')+'</button></div></div>'}).join('');update();}
+function toggle(i){const item=results[Number(i)];if(!item)return false;const at=selected.findIndex(x=>x.id===item.id);if(at>=0)selected.splice(at,1);else selected.push(item);sequence=buildSequence();renderToken++;render();update();draw(0).catch(e=>{$('qc').textContent='QC: Preview update failed — '+String(e.message||e)});return false;}window.toggle=toggle;
+function render(){const visible=results.filter(x=>mediaTab==='all'||(mediaTab==='photos'&&x.kind==='image')||(mediaTab==='videos'&&x.kind==='video'));$('grid').innerHTML=visible.map(x=>{const i=results.indexOf(x);const isSelected=selected.some(a=>a.id===x.id);return '<div class="card">'+(x.kind==='video'?'<video src="'+esc(x.playUrl||x.url)+'" poster="'+esc(x.thumbPlay||'')+'" muted playsinline preload="metadata" controls></video>':'<img src="'+esc(x.thumbPlay||x.url)+'" loading="lazy">')+'<b title="'+esc(x.title)+'">'+esc(x.title||'Untitled')+'</b><span class="muted">'+esc(x.source||'')+'</span><div class="actions"><button type="button" class="'+(isSelected?'sel':'')+'" onclick="event.preventDefault();event.stopPropagation();return toggle('+i+')">'+(isSelected?'✓ Selected':'Select')+'</button></div></div>'}).join('');update();}
 function buildSequence(){
  const imgs=selected.filter(x=>x.kind==='image'), vids=selected.filter(x=>x.kind==='video');
  if(!selected.length)return [];
@@ -203,7 +203,7 @@ function toggleTemplateDemo(event,button){
 window.toggleTemplateDemo=toggleTemplateDemo;
 function previewTemplate(i,event){
  event?.stopPropagation();
- const card=document.querySelector('#templateList .templateCard[data-template-design="'+esc(templates[i]?.design||'')+'"]');
+ const card=document.querySelector('#templateList .templateCard[data-template-index="'+Number(i)+'"]');
  if(!card)return false;
  const v=card.querySelector('video.templateDemoMedia');
  if(!v)return false;
@@ -238,9 +238,9 @@ function renderTemplates(){
    }else{
      visual='<div class="templateDemoFallback"><span>Select media to preview this template</span></div>';
    }
-   return '<article class="templateCard design-'+i%30+' '+(activeTemplate===t?'chosen':'')+'" data-template-design="'+esc(t.design)+'">'+
+   return '<article class="templateCard design-'+i%30+' '+(activeTemplate===t?'chosen':'')+'" data-template-index="'+i+'" data-template-design="'+esc(t.design)+'">'+
     '<div class="templateLive">'+visual+(m.video?'<button type="button" class="templatePlay" aria-label="Play template preview" onclick="toggleTemplateDemo(event,this)">▶</button>':'')+'<span class="templateLiveBadge">▶ PREVIEW · '+esc(t.speed)+'</span><div class="templateDemoOverlay"><b>'+esc(t.name)+'</b><span>'+esc(t.dur)+'s · '+esc(t.cat)+' · works with photo, video or mixed media</span></div></div>'+
-    '<div class="templateCardBody"><div><b>'+esc(t.name)+'</b><span>'+esc(t.desc)+'</span></div><div class="row"><button type="button" class="secondary" onclick="previewTemplate('+i+',event)">Preview</button><button type="button" class="primary" onclick="runTemplate('+i+');event.stopPropagation()">Use template</button></div></div></article>';
+    '<div class="templateCardBody"><div><b>'+esc(t.name)+'</b><span>'+esc(t.desc)+'</span></div><div class="row"><button type="button" class="secondary" onclick="event.preventDefault();event.stopPropagation();previewTemplate('+i+',event)">Preview</button><button type="button" class="primary" onclick="event.preventDefault();event.stopPropagation();runTemplate('+i+')">Use template</button></div></div></article>';
  }).join('')||'<div class="notice" style="grid-column:1/-1">No templates match this search.</div>';
  playTemplateVideos($('templateList'));
 }
