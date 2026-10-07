@@ -77,41 +77,49 @@ const server=createServer(async(req,res)=>{
         return d;
       }finally{clearTimeout(timer)}
     };
-    const searchWikimedia=async(searchTerm)=>{
-      const api=new URL('https://commons.wikimedia.org/w/api.php');
-      for(const [k,v] of [
-        ['action','query'],['format','json'],['formatversion','2'],
-        ['generator','search'],['gsrsearch',searchTerm],['gsrnamespace','6'],
-        ['gsrlimit','100'],['gsrwhat','text'],['prop','imageinfo'],
-        ['iiprop','url|mime|size'],['iiurlwidth','900'],['origin','*']
-      ]) api.searchParams.set(k,v);
-      return fetchJson(api,{headers:{
-        'User-Agent':'Festival-of-Bharat-Reel-Maker/1.2 (media search)',
-        'Accept':'application/json'
-      }},10000);
+    const searchWikimedia=async(searchTerm,targetKind,maxItems=100)=>{
+      const collected=[]; const seenPages=new Set(); let continuation=null;
+      for(let page=0;page<8 && collected.length<maxItems;page++){
+        const api=new URL('https://commons.wikimedia.org/w/api.php');
+        for(const [k,v] of [
+          ['action','query'],['format','json'],['formatversion','2'],
+          ['generator','search'],['gsrsearch',searchTerm],['gsrnamespace','6'],
+          ['gsrlimit','100'],['gsrwhat','text'],['prop','imageinfo'],
+          ['iiprop','url|mime|size'],['iiurlwidth','900'],['origin','*']
+        ]) api.searchParams.set(k,v);
+        if(continuation) api.searchParams.set('gsrcontinue',continuation);
+        const d=await fetchJson(api,{headers:{
+          'User-Agent':'Festival-of-Bharat-Reel-Maker/1.3 (media search)',
+          'Accept':'application/json'
+        }},12000);
+        for(const x of (d?.query?.pages||[])){
+          const z=x?.imageinfo?.[0],mime=String(z?.mime||'').toLowerCase();
+          const kind=mime.startsWith('image/')?'image':mime.startsWith('video/')?'video':'';
+          if(kind!==targetKind||!z?.url||seenPages.has(x.pageid))continue;
+          seenPages.add(x.pageid);
+          collected.push({
+            id:(kind==='video'?'wmv':'wm')+x.pageid,
+            title:x.title||('Wikimedia Commons '+kind),
+            source:'Wikimedia Commons',url:z.url,thumb:z.thumburl||'',kind
+          });
+          if(collected.length>=maxItems)break;
+        }
+        continuation=d?.continue?.gsrcontinue||null;
+        if(!continuation)break;
+      }
+      return collected;
     };
 
-    // Get photos and videos server-side together. The old flow returned as soon
-    // as photos existed and made video loading depend on a second browser call.
+    // Search photos and videos independently and paginate until each reaches 100
+    // real assets or Wikimedia genuinely runs out of matching results.
     const [photoAttempt,videoAttempt]=await Promise.allSettled([
-      searchWikimedia(q),
-      searchWikimedia(q+' filetype:video')
+      searchWikimedia(q,'image',100),
+      searchWikimedia(q+' filetype:video','video',100)
     ]);
 
     const consume=(attempt)=>{
       if(attempt.status!=='fulfilled') return;
-      for(const x of (attempt.value?.query?.pages||[])){
-        const z=x?.imageinfo?.[0], mime=String(z?.mime||'').toLowerCase();
-        if(!z?.url) continue;
-        if(mime.startsWith('image/')) add({
-          id:'wm'+x.pageid,title:x.title||'Wikimedia Commons image',
-          source:'Wikimedia Commons',url:z.url,thumb:z.thumburl||z.url,kind:'image'
-        });
-        else if(mime.startsWith('video/')) add({
-          id:'wmv'+x.pageid,title:x.title||'Wikimedia Commons video',
-          source:'Wikimedia Commons',url:z.url,thumb:z.thumburl||'',kind:'video'
-        });
-      }
+      for(const x of attempt.value||[]) add(x);
     };
     consume(photoAttempt); consume(videoAttempt);
     if(photoAttempt.status==='rejected') errors.push('Wikimedia photos: '+String(photoAttempt.reason?.message||photoAttempt.reason));
@@ -131,8 +139,8 @@ const server=createServer(async(req,res)=>{
       }catch(e){errors.push('Openverse photos: '+String(e.message||e))}
     }
 
-    const photos=results.filter(x=>x.kind==='image').slice(0,120);
-    const videos=results.filter(x=>x.kind==='video').slice(0,40);
+    const photos=results.filter(x=>x.kind==='image').slice(0,100);
+    const videos=results.filter(x=>x.kind==='video').slice(0,100);
     const finalResults=[...photos,...videos];
     if(!finalResults.length) return send(res,502,{'Content-Type':'application/json','Cache-Control':'no-store'},
       JSON.stringify({error:'No media found',details:errors}));
