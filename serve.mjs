@@ -24,7 +24,7 @@ const server=createServer(async(req,res)=>{
   }
   if(u.pathname==='/proxy' && req.method==='GET'){
     const target=u.searchParams.get('url')||'';
-    if(!/^https?:\\/\\//i.test(target)) return send(res,400,{'Content-Type':'application/json'},JSON.stringify({error:'Invalid media URL'}));
+    if(!/^https?:\/\//i.test(target)) return send(res,400,{'Content-Type':'application/json'},JSON.stringify({error:'Invalid media URL'}));
     try{
       const upstream=await fetch(target,{
         headers:{
