@@ -482,8 +482,7 @@ $('musicFile').onchange=async e=>{const f=e.target.files?.[0];if(!f)return;try{i
 $('previewMusic').onclick=async()=>{if(!audioObj)return alert('Choose a music track or import a song first');audioObj.currentTime=+$('musicStart').value;await audioObj.play();audioObj.ontimeupdate=()=>{if(audioObj.currentTime>=+$('musicEnd').value){audioObj.pause();audioObj.ontimeupdate=null}}};
 $('stopMusic').onclick=()=>audioObj?.pause();musicPreview?.pause();
 $('export').onclick=async()=>{
- if(!selected.length)autoSelect();
- if(!selected.length){$('qc').textContent='QC: Add or import media first';return}
+ if(!selected.length){$('qc').textContent='QC: Select media first — export requires explicit selection';return}
  if(!sequence.length)sequence=buildSequence();
  if(!sequence.length){$('qc').textContent='QC: No usable scenes found';return}
  try{
