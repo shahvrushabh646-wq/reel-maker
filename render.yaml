@@ -3,7 +3,7 @@ services:
     name: reel-maker
     runtime: node
     plan: free
-    buildCommand: npm install
+    buildCommand: npm install --no-audit --no-fund --fetch-retries=5 --fetch-retry-mintimeout=2000 --fetch-retry-maxtimeout=20000
     startCommand: npm start
     healthCheckPath: /health
     envVars:
