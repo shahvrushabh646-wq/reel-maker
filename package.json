@@ -7,7 +7,7 @@
     "start": "node serve.mjs"
   },
   "engines": {
-    "node": ">=20"
+    "node": "22.16.0"
   },
   "dependencies": {
     "ffmpeg-static": "^5.2.0"
