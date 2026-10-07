@@ -171,16 +171,11 @@ function templateDemoMedia(i){
  // If both are selected, alternate between the actual selected assets.
  const imgs=selected.filter(x=>x.kind==='image');
  const vids=selected.filter(x=>x.kind==='video');
- const pool=selected.length?selected:(results||[]);
  const fallbackImg=imgs.length?imgs[i%imgs.length]:null;
  const fallbackVid=vids.length?vids[i%vids.length]:null;
- const item=pool.length?pool[i%pool.length]:null;
- const photo=item?.kind==='image' ? (item.thumbPlay||item.playUrl||item.url||'') : (fallbackImg?.thumbPlay||fallbackImg?.playUrl||fallbackImg?.url||'');
- let video='';
- if(item?.kind==='video') video=item.playUrl||item.url||'';
- else if(fallbackVid) video=fallbackVid.playUrl||fallbackVid.url||'';
- else if(!selected.length) video=proxy(BUILTIN_TEMPLATE_VIDEOS[i%BUILTIN_TEMPLATE_VIDEOS.length]);
- return {photo,video,kind:item?.kind||''};
+ const video=fallbackVid?.playUrl||fallbackVid?.url||proxy(BUILTIN_TEMPLATE_VIDEOS[i%BUILTIN_TEMPLATE_VIDEOS.length]);
+ const photo=fallbackImg?.thumbPlay||fallbackImg?.playUrl||fallbackImg?.url||'';
+ return {photo,video,kind:'video'};
 }
 function playTemplateVideos(root=document){
  const videos=[...root.querySelectorAll('video.templateDemoMedia, video.templatePreviewVideo')];
@@ -268,7 +263,6 @@ function pickTemplate(i){
 async function runTemplate(i){
  pickTemplate(i);
  openWorkspace('preview');
- if(!selected.length)autoSelect();
  setTimeout(()=>playTemplateVideos(document),60);
  if(!selected.length){$('qc').textContent='QC: Add or import media first';return;}
  sequence=buildSequence();renderToken++;
@@ -299,7 +293,7 @@ $('duration').oninput=e=>{$('durVal').textContent=e.target.value+'s';sequence=bu
 $('selectAll').onclick=()=>{results.forEach(x=>{if(!selected.some(a=>a.id===x.id))selected.push(x)});render();draw(0)};
 $('clear').onclick=()=>{selected.length=0;render();draw(0)};
 $('importBtn').onclick=()=>$('files').click();
-$('files').onchange=e=>{[...e.target.files].forEach(f=>{const u=URL.createObjectURL(f);results.unshift({id:crypto.randomUUID(),title:f.name,source:'Local',url:u,playUrl:u,thumbPlay:u,kind:f.type.startsWith('video')?'video':'image'})});autoSelect();sequence=buildSequence();render();renderToken++;draw(0)};
+$('files').onchange=e=>{[...e.target.files].forEach(f=>{const u=URL.createObjectURL(f);results.unshift({id:crypto.randomUUID(),title:f.name,source:'Local',url:u,playUrl:u,thumbPlay:u,kind:f.type.startsWith('video')?'video':'image'})});sequence=buildSequence();render();renderToken++;draw(0)};
 async function json(u){try{const r=await fetch(u);return r.ok?await r.json():null}catch{return null}}
 async function search(q){
   q=String(q||'').trim();
@@ -320,7 +314,7 @@ async function search(q){
     const pc=results.filter(x=>x.kind==='image').length, vc=results.filter(x=>x.kind==='video').length;
     $('sourceStatus').textContent='Loaded '+pc+' photos + '+vc+' videos';
     $('statusTop').textContent='READY';
-    autoSelect(); sequence=buildSequence(); render(); renderToken++; draw(0);
+    sequence=[]; render(); renderToken++; draw(0);
   }catch(e){
     $('statusTop').textContent='ERROR';
     $('sourceStatus').textContent='Media search failed: '+String(e.message||e);
@@ -337,7 +331,7 @@ function autoSelect(){
  else {let a=0,b=0;while(selected.length<16&&(a<im.length||b<vi.length)){if(selected.length%2===0&&a<im.length)selected.push(im[a++]);else if(b<vi.length)selected.push(vi[b++]);else if(a<im.length)selected.push(im[a++]);}}
  update();
 }
-$('generate').onclick=async()=>{if(!results.length){$('form').requestSubmit();return}autoSelect();sequence=buildSequence();renderToken++;openWorkspace('preview');await new Promise(requestAnimationFrame);await $('build').click();start()};
+$('generate').onclick=async()=>{if(!selected.length){openWorkspace('media');$('qc').textContent='QC: Select media first — search results are not auto-selected';return false}sequence=buildSequence();renderToken++;openWorkspace('preview');await new Promise(requestAnimationFrame);const ok=await $('build').click();if(ok&&!playing)start();return ok};
 const imageCache=new Map(),videoCache=new Map();
 function fit(ctx,s,cw,ch,z=1,panX=0,panY=0,rot=0){const w=s.videoWidth||s.naturalWidth||s.width,h=s.videoHeight||s.naturalHeight||s.height;if(!w||!h)return false;const sc=Math.max(cw/w,ch/h)*z;ctx.save();ctx.translate(cw/2+panX,ch/2+panY);ctx.rotate(rot);ctx.drawImage(s,-w*sc/2,-h*sc/2,w*sc,h*sc);ctx.restore();return true}
 function mediaCandidates(a){
@@ -456,8 +450,7 @@ async function ensureSelectedFontReady(){
 function overlay(ctx,idx,label){ctx.fillStyle='rgba(0,0,0,.34)';ctx.fillRect(0,0,1080,240);const ff=$('fontFamily')?.value||'Noto Sans';ctx.fillStyle='#fff';ctx.font=($('fontWeight')?.value||'700')+' 54px "'+ff+'",sans-serif';ctx.fillText('Festival of Bharat',50,104);ctx.font='600 34px "'+ff+'",sans-serif';ctx.fillText((idx+1)+' / '+(sequence.length||selected.length)+' · '+(label||''),50,168);const txt=$('captionText')?.value?.trim();if(txt){ctx.textAlign='center';ctx.font=($('fontWeight')?.value||'700')+' '+(($('fontSize')?.value||34)*2)+'px "'+ff+'",sans-serif';const y=$('captionPos').value==='top'?310:$('captionPos').value==='middle'?1000:1750;ctx.fillStyle='rgba(0,0,0,.48)';ctx.fillRect(50,y-86,980,116);ctx.fillStyle='#fff';ctx.fillText(txt,540,y);ctx.textAlign='left'}}
 function start(){if(playing)return;playing=true;started=performance.now();const f=async n=>{if(!playing)return;const ok=await draw((n-started)/1000);if(!ok){playing=false;cancelAnimationFrame(raf);return}if(playing)raf=requestAnimationFrame(f)};raf=requestAnimationFrame(f)}
 $('build').onclick=async()=>{
- if(!selected.length)autoSelect();
- if(!selected.length){$('qc').textContent='QC: Add or import media first';return false}
+ if(!selected.length){$('qc').textContent='QC: Select media first — use Select on media cards or Select all';return false}
  sequence=buildSequence();
  if(!sequence.length){$('qc').textContent='QC: No scenes could be created';return false}
  playing=false;cancelAnimationFrame(raf);renderToken++;
