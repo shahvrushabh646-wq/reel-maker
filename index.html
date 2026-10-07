@@ -370,30 +370,35 @@ function loadImage(url){
    const attempt=()=>{
      if(n>=urls.length){reject(new Error('image load failed: '+String(source).slice(0,180)));return}
      const im=new Image(); im.decoding='async'; im.crossOrigin='anonymous'; im.referrerPolicy='no-referrer';
-     im.onload=()=>resolve(im);
-     im.onerror=()=>{n++;attempt()};
+     let timer=setTimeout(()=>{try{im.src=''}catch{};reject(new Error('image load timed out: '+String(source).slice(0,180)))},12000);
+     im.onload=()=>{clearTimeout(timer);resolve(im)};
+     im.onerror=()=>{clearTimeout(timer);n++;attempt()};
      im.src=urls[n++];
    }; attempt();
  });
- imageCache.set(source,p); return p;
+ imageCache.set(source,p);
+ p.catch(()=>imageCache.delete(source));
+ return p;
 }
 function loadVideo(a){
  if(videoCache.has(a.id))return videoCache.get(a.id);
  const p=new Promise((resolve,reject)=>{
-   const urls=mediaCandidates(a); let n=0, settled=false;
+   const urls=mediaCandidates(a); let n=0, settled=false, timer=null;
    const attempt=()=>{
      if(n>=urls.length){reject(new Error('video load failed: '+String(a?.title||a?.id||'selected asset')));return}
      const v=document.createElement('video');
      v.src=urls[n++]; v.muted=true; v.defaultMuted=true; v.playsInline=true; v.preload='auto'; v.crossOrigin='anonymous'; v.referrerPolicy='no-referrer';
-     const ok=()=>{if(!settled){settled=true;resolve(v)}};
-     const fail=()=>{v.removeAttribute('src');v.load();attempt()};
+     const ok=()=>{if(!settled){settled=true;if(timer)clearTimeout(timer);resolve(v)}};
+     const fail=()=>{if(timer)clearTimeout(timer);v.removeAttribute('src');v.load();attempt()};
      v.addEventListener('loadeddata',ok,{once:true});
      v.addEventListener('canplay',ok,{once:true});
      v.addEventListener('error',fail,{once:true});
-     setTimeout(()=>{if(!settled && v.readyState>=2)ok()},6000);
+     timer=setTimeout(()=>{if(!settled){v.removeAttribute('src');v.load();attempt()}},12000);
    }; attempt();
  });
- videoCache.set(a.id,p); return p;
+ videoCache.set(a.id,p);
+ p.catch(()=>videoCache.delete(a.id));
+ return p;
 }
 function sceneAt(t){
  if(!sequence.length)sequence=buildSequence();
