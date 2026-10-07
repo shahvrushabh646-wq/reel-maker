@@ -593,7 +593,8 @@ $('build').onclick=async()=>{
    $('qc').textContent='QC: Building reel · '+sequence.length+' scenes · '+activeTemplate.name+'…';
    openWorkspace('preview',{skipRender:true});
    await new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve)));
-   // Render and validate the first actual frame before starting playback.
+   // Validate every scene asset before starting playback, then render the first frame.
+   await validateSequenceMedia();
    const ok=await draw(0,true);
    if(!ok){
      // draw() has already written the exact media/render failure to QC.
