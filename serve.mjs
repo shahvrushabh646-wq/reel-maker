@@ -22,6 +22,26 @@ const server=createServer(async(req,res)=>{
     try { const html=await readFile(resolve(root,'index.html'),'utf8'); return send(res,200,{'Content-Type':'text/html; charset=utf-8','Cache-Control':'no-store'},html); }
     catch(e){ return send(res,500,{'Content-Type':'text/plain'},'Could not read index.html'); }
   }
+  if(u.pathname==='/proxy' && req.method==='GET'){
+    const target=u.searchParams.get('url')||'';
+    if(!/^https?:\\/\\//i.test(target)) return send(res,400,{'Content-Type':'application/json'},JSON.stringify({error:'Invalid media URL'}));
+    try{
+      const upstream=await fetch(target,{
+        headers:{
+          'User-Agent':'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/154 Safari/537.36',
+          'Accept':'image/avif,image/webp,image/apng,image/svg+xml,image/*,video/*,*/*;q=0.8'
+        },
+        redirect:'follow'
+      });
+      if(!upstream.ok) return send(res,upstream.status,{'Content-Type':'application/json'},JSON.stringify({error:'Upstream media HTTP '+upstream.status}));
+      const type=upstream.headers.get('content-type')||'application/octet-stream';
+      const body=Buffer.from(await upstream.arrayBuffer());
+      if(!body.length)return send(res,502,{'Content-Type':'application/json'},JSON.stringify({error:'Empty upstream media'}));
+      return send(res,200,{'Content-Type':type,'Content-Length':body.length,'Cache-Control':'public,max-age=300'},body);
+    }catch(e){
+      return send(res,502,{'Content-Type':'application/json'},JSON.stringify({error:'Media proxy failed',detail:String(e.message||e)}));
+    }
+  }
   if(u.pathname==='/convert-mp4' && req.method==='POST'){
     const chunks=[]; let size=0; const max=180*1024*1024;
     const declared=Number(req.headers['content-length']||0);
