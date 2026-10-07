@@ -79,29 +79,22 @@ const server=createServer(async(req,res)=>{
     };
     const searchWikimedia=async(searchTerm,targetKind,maxItems=100)=>{
       const collected=[]; const seenPages=new Set(); let continuation=null;
-      for(let page=0;page<8 && collected.length<maxItems;page++){
+      // Keep each request bounded so Render does not sit on a long-running search.
+      for(let page=0;page<4 && collected.length<maxItems;page++){
         const api=new URL('https://commons.wikimedia.org/w/api.php');
         for(const [k,v] of [
-          ['action','query'],['format','json'],['formatversion','2'],
-          ['generator','search'],['gsrsearch',searchTerm],['gsrnamespace','6'],
-          ['gsrlimit','100'],['gsrwhat','text'],['prop','imageinfo'],
-          ['iiprop','url|mime|size'],['iiurlwidth','900'],['origin','*']
+          ['action','query'],['format','json'],['formatversion','2'],['generator','search'],
+          ['gsrsearch',searchTerm],['gsrnamespace','6'],['gsrlimit','100'],['gsrwhat','text'],
+          ['prop','imageinfo'],['iiprop','url|mime|size'],['iiurlwidth','900'],['origin','*']
         ]) api.searchParams.set(k,v);
         if(continuation) api.searchParams.set('gsrcontinue',continuation);
-        const d=await fetchJson(api,{headers:{
-          'User-Agent':'Festival-of-Bharat-Reel-Maker/1.3 (media search)',
-          'Accept':'application/json'
-        }},12000);
+        const d=await fetchJson(api,{headers:{'User-Agent':'Festival-of-Bharat-Reel-Maker/1.3','Accept':'application/json'}},8000);
         for(const x of (d?.query?.pages||[])){
           const z=x?.imageinfo?.[0],mime=String(z?.mime||'').toLowerCase();
           const kind=mime.startsWith('image/')?'image':mime.startsWith('video/')?'video':'';
           if(kind!==targetKind||!z?.url||seenPages.has(x.pageid))continue;
           seenPages.add(x.pageid);
-          collected.push({
-            id:(kind==='video'?'wmv':'wm')+x.pageid,
-            title:x.title||('Wikimedia Commons '+kind),
-            source:'Wikimedia Commons',url:z.url,thumb:z.thumburl||'',kind
-          });
+          collected.push({id:(kind==='video'?'wmv':'wm')+x.pageid,title:x.title||('Wikimedia Commons '+kind),source:'Wikimedia Commons',url:z.url,thumb:z.thumburl||'',kind});
           if(collected.length>=maxItems)break;
         }
         continuation=d?.continue?.gsrcontinue||null;
@@ -110,20 +103,16 @@ const server=createServer(async(req,res)=>{
       return collected;
     };
 
-    // Search photos and videos independently and paginate until each reaches 100
-    // real assets or Wikimedia genuinely runs out of matching results.
+    // Photos and videos are searched independently. We return real results as soon as
+    // Wikimedia has them; the UI never invents missing assets just to reach 100.
     const [photoAttempt,videoAttempt]=await Promise.allSettled([
       searchWikimedia(q,'image',100),
-      searchWikimedia(q+' filetype:video','video',100)
+      searchWikimedia(q,'video',100)
     ]);
-
-    const consume=(attempt)=>{
-      if(attempt.status!=='fulfilled') return;
-      for(const x of attempt.value||[]) add(x);
-    };
+    const consume=(attempt)=>{if(attempt.status==='fulfilled')for(const x of attempt.value||[])add(x)};
     consume(photoAttempt); consume(videoAttempt);
-    if(photoAttempt.status==='rejected') errors.push('Wikimedia photos: '+String(photoAttempt.reason?.message||photoAttempt.reason));
-    if(videoAttempt.status==='rejected') errors.push('Wikimedia videos: '+String(videoAttempt.reason?.message||videoAttempt.reason));
+    if(photoAttempt.status==='rejected')errors.push('Wikimedia photos: '+String(photoAttempt.reason?.message||photoAttempt.reason));
+    if(videoAttempt.status==='rejected')errors.push('Wikimedia videos: '+String(videoAttempt.reason?.message||videoAttempt.reason));
 
     // Openverse is only a photo fallback.
     if(!results.some(x=>x.kind==='image')){
