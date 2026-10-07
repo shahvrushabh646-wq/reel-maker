@@ -118,7 +118,8 @@ function update(){ $('photoCount').textContent=results.filter(x=>x.kind==='image
 let mediaTab='photos';
 function setMediaTab(tab){mediaTab=tab;render()}
 window.setMediaTab=setMediaTab;
-function render(){const visible=results.filter(x=>mediaTab==='all'||(mediaTab==='photos'&&x.kind==='image')||(mediaTab==='videos'&&x.kind==='video'));$('grid').innerHTML=visible.map(x=>{const i=results.indexOf(x);return '<div class="card">'+(x.kind==='video'?'<video src="'+esc(x.playUrl||x.url)+'" poster="'+esc(x.thumbPlay||'')+'" muted playsinline preload="metadata" controls></video>':'<img src="'+esc(x.thumbPlay||x.url)+'" loading="lazy">')+'<b title="'+esc(x.title)+'">'+esc(x.title||'Untitled')+'</b><span class="muted">'+esc(x.source||'')+'</span><div class="actions"><button class="'+(selected.some(a=>a.id===x.id)?'sel':'')+'" onclick="toggle('+i+')">'+(selected.some(a=>a.id===x.id)?'✓ Selected':'Select')+'</button></div></div>'}).join('');update();}
+function toggle(i){const item=results[Number(i)];if(!item)return false;const at=selected.findIndex(x=>x.id===item.id);if(at>=0)selected.splice(at,1);else selected.push(item);sequence=buildSequence();renderToken++;render();draw(0);return true;}window.toggle=toggle;
+function render(){const visible=results.filter(x=>mediaTab==='all'||(mediaTab==='photos'&&x.kind==='image')||(mediaTab==='videos'&&x.kind==='video'));$('grid').innerHTML=visible.map(x=>{const i=results.indexOf(x);const isSelected=selected.some(a=>a.id===x.id);return '<div class="card">'+(x.kind==='video'?'<video src="'+esc(x.playUrl||x.url)+'" poster="'+esc(x.thumbPlay||'')+'" muted playsinline preload="metadata" controls></video>':'<img src="'+esc(x.thumbPlay||x.url)+'" loading="lazy">')+'<b title="'+esc(x.title)+'">'+esc(x.title||'Untitled')+'</b><span class="muted">'+esc(x.source||'')+'</span><div class="actions"><button type="button" class="'+(isSelected?'sel':'')+'" onclick="event.stopPropagation();toggle('+i+')">'+(isSelected?'✓ Selected':'Select')+'</button></div></div>'}).join('');update();}
 function buildSequence(){
  const imgs=selected.filter(x=>x.kind==='image'), vids=selected.filter(x=>x.kind==='video');
  if(!selected.length)return [];
@@ -200,6 +201,21 @@ function toggleTemplateDemo(event,button){
  }
 }
 window.toggleTemplateDemo=toggleTemplateDemo;
+function previewTemplate(i,event){
+ event?.stopPropagation();
+ const card=document.querySelector('#templateList .templateCard[data-template-design="'+esc(templates[i]?.design||'')+'"]');
+ if(!card)return false;
+ const v=card.querySelector('video.templateDemoMedia');
+ if(!v)return false;
+ document.querySelectorAll('#templateList video.templateDemoMedia').forEach(x=>{if(x!==v){try{x.pause()}catch{} }});
+ if(!v.src){v.src=v.dataset.src||'';v.preload='auto';}
+ v.muted=true;v.defaultMuted=true;v.playsInline=true;v.controls=true;
+ const p=v.play();
+ if(p&&p.catch)p.catch(()=>{});
+ return true;
+}
+window.previewTemplate=previewTemplate;
+
 function renderTemplates(){
  const tabs=$('templateTabs'),list=$('templateList');
  if(!tabs||!list)return;
@@ -222,9 +238,9 @@ function renderTemplates(){
    }else{
      visual='<div class="templateDemoFallback"><span>Select media to preview this template</span></div>';
    }
-   return '<article class="templateCard design-'+i%30+' '+(activeTemplate===t?'chosen':'')+'" data-template-design="'+esc(t.design)+'" onclick="runTemplate('+i+');event.stopPropagation()">'+
+   return '<article class="templateCard design-'+i%30+' '+(activeTemplate===t?'chosen':'')+'" data-template-design="'+esc(t.design)+'">'+
     '<div class="templateLive">'+visual+(m.video?'<button type="button" class="templatePlay" aria-label="Play template preview" onclick="toggleTemplateDemo(event,this)">▶</button>':'')+'<span class="templateLiveBadge">▶ PREVIEW · '+esc(t.speed)+'</span><div class="templateDemoOverlay"><b>'+esc(t.name)+'</b><span>'+esc(t.dur)+'s · '+esc(t.cat)+' · works with photo, video or mixed media</span></div></div>'+
-    '<div class="templateCardBody"><div><b>'+esc(t.name)+'</b><span>'+esc(t.desc)+'</span></div><button type="button" class="primary" onclick="runTemplate('+i+');event.stopPropagation()">Use template</button></div></article>';
+    '<div class="templateCardBody"><div><b>'+esc(t.name)+'</b><span>'+esc(t.desc)+'</span></div><div class="row"><button type="button" class="secondary" onclick="previewTemplate('+i+',event)">Preview</button><button type="button" class="primary" onclick="runTemplate('+i+');event.stopPropagation()">Use template</button></div></div></article>';
  }).join('')||'<div class="notice" style="grid-column:1/-1">No templates match this search.</div>';
  playTemplateVideos($('templateList'));
 }
@@ -237,16 +253,20 @@ function pickTemplate(i){
  sequence=buildSequence();renderTemplates();update();renderToken++;draw(0);
 }
 async function runTemplate(i){
+ if(!templates[i])return false;
  pickTemplate(i);
  openWorkspace('preview');
  setTimeout(()=>playTemplateVideos(document),60);
- if(!selected.length){$('qc').textContent='QC: Add or import media first';return;}
+ if(!selected.length){
+   $('qc').textContent='QC: Template applied — select media to build the reel';
+   return true;
+ }
  sequence=buildSequence();renderToken++;
  await new Promise(requestAnimationFrame);
  const ok=await draw(0);
- if(!ok){$('qc').textContent='QC: Template preview failed — selected media could not be loaded';return;}
+ if(!ok){$('qc').textContent='QC: Template applied, but selected media could not be loaded';return false;}
  $('qc').textContent='QC: '+sequence.length+' scenes · '+activeTemplate.name+' · ready to play';
- playing=false;start();
+ playing=false;start();return true;
 }
 window.setCat=c=>{templateCat=c;renderTemplates()};
 window.pickTemplate=pickTemplate;window.runTemplate=runTemplate;
