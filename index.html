@@ -526,21 +526,43 @@ function overlay(ctx,idx,label){
 }
 function start(){if(playing)return;playing=true;started=performance.now();const f=async n=>{if(!playing)return;const ok=await draw((n-started)/1000);if(!ok){playing=false;cancelAnimationFrame(raf);return}if(playing)raf=requestAnimationFrame(f)};raf=requestAnimationFrame(f)}
 $('build').onclick=async()=>{
- if(!selected.length){$('qc').textContent='QC: Select media first — use Select on media cards or Select all';return false}
- sequence=buildSequence();
- if(!sequence.length){$('qc').textContent='QC: No scenes could be created';return false}
- playing=false;cancelAnimationFrame(raf);renderToken++;
- $('qc').textContent='QC: Building '+sequence.length+' scenes…';
- openWorkspace('preview');
- await new Promise(requestAnimationFrame);
  try{
-   const ok=await draw(0);
-   if(!ok)throw new Error('One or more selected media assets could not be loaded');
-   $('qc').textContent='QC: '+sequence.length+' scenes · '+activeTemplate.name+' · '+$('duration').value+'s · READY';
+   playing=false;
+   cancelAnimationFrame(raf);
+   renderToken++;
+   if(!selected.length){
+     $('qc').textContent='QC: Build stopped — select at least 1 photo or video first';
+     openWorkspace('media');
+     return false;
+   }
+   if(!activeTemplate){
+     $('qc').textContent='QC: Build stopped — select a template first';
+     openWorkspace('templates');
+     return false;
+   }
+   const bad=selected.find(x=>!x || !x.kind || !(x.playUrl||x.url||x.thumbPlay));
+   if(bad){
+     $('qc').textContent='QC: Build stopped — selected media has no playable file: '+String(bad.title||bad.id||'Unknown media');
+     return false;
+   }
+   sequence=buildSequence();
+   if(!sequence.length){
+     $('qc').textContent='QC: Build stopped — selected media could not create scenes';
+     return false;
+   }
+   $('qc').textContent='QC: Building reel · '+sequence.length+' scenes · '+activeTemplate.name+'…';
+   openWorkspace('preview');
+   await new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve)));
+   // Render and validate the first actual frame before starting playback.
+   const ok=await draw(0,true);
+   if(!ok)throw new Error('The selected photo/video could not be rendered');
+   $('qc').textContent='QC: Reel built · '+sequence.length+' scenes · '+activeTemplate.name+' · READY';
    start();
    return true;
  }catch(e){
-   $('qc').textContent='QC: Build failed — '+String(e.message||e);
+   playing=false;
+   cancelAnimationFrame(raf);
+   $('qc').textContent='QC: Build failed — '+String(e?.message||e||'Unknown build error');
    return false;
  }
 };
