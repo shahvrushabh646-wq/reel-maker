@@ -289,7 +289,7 @@ window.setCat=c=>{templateCat=c;renderTemplates()};
 window.pickTemplate=pickTemplate;window.runTemplate=runTemplate;
 window.clearTemplateSearch=()=>{const el=$('templateSearch');if(el)el.value='';renderTemplates()};
 $('templateSearch').oninput=()=>renderTemplates();
-window.openWorkspace=function(tab){
+window.openWorkspace=function(tab,options={}){
   document.querySelectorAll('.workspaceSection').forEach(el=>el.classList.toggle('hidden',el.id!==tab));
   document.querySelectorAll('.workspaceTab').forEach(b=>b.classList.toggle('active',b.dataset.tab===tab));
   if(tab==='templates'){
@@ -299,7 +299,7 @@ window.openWorkspace=function(tab){
     }
     requestAnimationFrame(()=>document.getElementById('templates')?.scrollIntoView({behavior:'smooth',block:'start'}));
   }
-  if(tab==='preview')draw(0);
+  if(tab==='preview'&&!options.skipRender)draw(0);
 };
 renderTemplates();pickTemplate(0);
 $('duration').oninput=e=>{$('durVal').textContent=e.target.value+'s';sequence=buildSequence();renderToken++;draw(0)};$('mix').oninput=()=>{update();sequence=buildSequence();renderToken++;draw(0)};
@@ -572,7 +572,7 @@ $('build').onclick=async()=>{
      return false;
    }
    $('qc').textContent='QC: Building reel · '+sequence.length+' scenes · '+activeTemplate.name+'…';
-   openWorkspace('preview');
+   openWorkspace('preview',{skipRender:true});
    await new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve)));
    // Render and validate the first actual frame before starting playback.
    const ok=await draw(0,true);
