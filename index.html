@@ -151,7 +151,7 @@ function templateDemoMedia(i){
  // Template demos are independent of user media selection.
  // The demo is always a real playable video; selected media is used only
  // when the user actually runs the template.
- const video=proxy(BUILTIN_TEMPLATE_VIDEOS[i%BUILTIN_TEMPLATE_VIDEOS.length]);
+ const video=BUILTIN_TEMPLATE_VIDEOS[i%BUILTIN_TEMPLATE_VIDEOS.length];
  return {photo:'',video,kind:'video'};
 }
 function playTemplateVideos(root=document){
@@ -164,8 +164,7 @@ function playTemplateVideos(root=document){
      const src=v.dataset.src;
      if(src){v.src=src;v.preload='metadata';}
    }
-   const go=()=>{try{const p=v.play(); if(p&&p.catch)p.catch(()=>{});}catch(e){}};
-   if(v.readyState>=2)go();else v.addEventListener('canplay',go,{once:true});
+   // Do not autoplay the entire 150-template gallery. The user explicitly starts a preview.
  };
  const deactivate=v=>{try{v.pause()}catch{}};
  if('IntersectionObserver' in window){
@@ -210,8 +209,9 @@ function previewTemplate(i,event){
  document.querySelectorAll('#templateList video.templateDemoMedia').forEach(x=>{if(x!==v){try{x.pause()}catch{} }});
  if(!v.src){v.src=v.dataset.src||'';v.preload='auto';}
  v.muted=true;v.defaultMuted=true;v.playsInline=true;v.controls=true;
+ v.currentTime=0;
  const p=v.play();
- if(p&&p.catch)p.catch(()=>{});
+ if(p&&p.catch)p.catch(()=>{ $('qc').textContent='QC: Template demo could not autoplay — use the video play control'; });
  return true;
 }
 window.previewTemplate=previewTemplate;
