@@ -399,24 +399,32 @@ function mediaCandidates(a){
  }
  return arr;
 }
-function loadImage(url){
- const source=playableUrl(url);
- if(imageCache.has(source))return imageCache.get(source);
+function loadImage(value){
+ const raw=typeof value==='string'?value:(value?.playUrl||value?.url||value?.thumbPlay||'');
+ const candidates=[];
+ for(const u of [raw,typeof value==='object'?value?.url:'',typeof value==='object'?value?.thumbPlay:'']){
+   const p=playableUrl(u); if(p&&!candidates.includes(p))candidates.push(p);
+ }
+ const key=candidates[0]||raw;
+ if(imageCache.has(key))return imageCache.get(key);
  const p=new Promise((resolve,reject)=>{
-   const urls=[source].filter(Boolean); let n=0;
+   let n=0;
    const attempt=()=>{
-     if(n>=urls.length){reject(new Error('image load failed: '+String(source).slice(0,180)));return}
+     if(n>=candidates.length){reject(new Error('image load failed: '+String(raw).slice(0,180)));return}
+     const source=candidates[n++];
      const im=new Image(); im.decoding='async'; im.crossOrigin='anonymous'; im.referrerPolicy='no-referrer';
-     let timer=setTimeout(()=>{try{im.src=''}catch{};reject(new Error('image load timed out: '+String(source).slice(0,180)))},12000);
-     im.onload=()=>{clearTimeout(timer);resolve(im)};
-     im.onerror=()=>{clearTimeout(timer);n++;attempt()};
-     im.src=urls[n++];
-   }; attempt();
+     let done=false;
+     const finish=(fn)=>{if(done)return;done=true;clearTimeout(timer);fn()};
+     const timer=setTimeout(()=>finish(()=>attempt()),12000);
+     im.onload=()=>finish(()=>resolve(im));
+     im.onerror=()=>finish(()=>attempt());
+     im.src=source;
+   };
+   attempt();
  });
- imageCache.set(source,p);
- p.catch(()=>imageCache.delete(source));
- return p;
+ imageCache.set(key,p);p.catch(()=>imageCache.delete(key));return p;
 }
+
 function loadVideo(a){
  if(videoCache.has(a.id))return videoCache.get(a.id);
  const p=new Promise((resolve,reject)=>{
@@ -502,6 +510,7 @@ async function draw(t,captureFrame=false){
      }catch{}
    }
    await renderTemplateMedia(ctx,media,scene,local,idx,slot,captureFrame);
+   applyTransition(ctx,activeTemplate.transition,local,idx,sequence.length);
    overlay(ctx,idx,scene.label);
    $('bar').style.width=Math.round(local*100)+'%';
    return true;
@@ -610,6 +619,22 @@ async function renderTemplateMedia(ctx,media,scene,local,idx,slot,captureFrame){
    await rect(media,0,0,W,H,1.18,local*12);card(0,H-500,W,500,'rgba(0,0,0,.84)');line(50,1330,W-50,1330,8,'#fff');
  }else{
    await rect(media,0,0,W,H,1.05,local*3);
+ }
+}
+function applyTransition(ctx,id,local,idx,total){
+ const u=Math.max(0,Math.min(1,local));
+ const W=ctx.canvas.width,H=ctx.canvas.height;
+ const edge=Math.min(.18,Math.max(.08,1/Math.max(4,total)));
+ let a=0;
+ if(id==='fade'||id==='crossfade'||id==='reveal'||id==='mask') a=Math.max(0,(edge-u)/edge)*.78;
+ else if(id==='flash'||id==='film-cut') a=Math.max(0,(.08-u)/.08)*.92;
+ else if(id==='hard') a=u<.045?.7:0;
+ if(a>0){ctx.save();ctx.fillStyle=id==='flash'?'rgba(255,255,255,'+a+')':'rgba(0,0,0,'+a+')';ctx.fillRect(0,0,W,H);ctx.restore();}
+ if(id==='slide'||id==='wipe'){
+   const p=Math.max(0,Math.min(1,u/edge));
+   ctx.save();ctx.fillStyle='rgba(5,6,8,'+(1-p)*.96+')';
+   if(idx%2){ctx.fillRect(W*(1-p),0,W*p,H)}else{ctx.fillRect(0,0,W*(1-p),H)}
+   ctx.restore();
  }
 }
 function overlay(ctx,idx,label){
