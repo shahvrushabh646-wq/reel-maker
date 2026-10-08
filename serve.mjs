@@ -112,80 +112,191 @@ const server=createServer(async(req,res)=>{
     if(!q) return send(res,400,{'Content-Type':'application/json'},JSON.stringify({error:'Missing query'}));
 
     const results=[]; const seen=new Set(); const errors=[];
-    const add=(x)=>{if(x?.url&&!seen.has(x.url)){seen.add(x.url);results.push(x)}};
-    const fetchJson=async(url,options={},ms=10000)=>{
+    const add=(x)=>{
+      if(!x?.url) return;
+      const key=String(x.url).split('?')[0];
+      if(seen.has(key)) return;
+      seen.add(key);
+      results.push(x);
+    };
+    const fetchJson=async(url,options={},ms=12000)=>{
       const ctl=new AbortController(); const timer=setTimeout(()=>ctl.abort(),ms);
       try{
         const r=await fetch(url,{...options,signal:ctl.signal});
-        const body=await r.text(); let d=null; try{d=JSON.parse(body)}catch{}
-        if(!r.ok) throw new Error('HTTP '+r.status);
+        const body=await r.text();
+        let d=null; try{d=JSON.parse(body)}catch{}
+        if(!r.ok){
+          const msg=(d&& (d.error?.message||d.detail||d.title)) || body.slice(0,180) || ('HTTP '+r.status);
+          const err=new Error(msg);
+          err.status=r.status;
+          throw err;
+        }
         return d;
       }finally{clearTimeout(timer)}
     };
-    const searchWikimedia=async(searchTerm,targetKind,maxItems=100)=>{
+    const withRetry=async(fn,tries=3)=>{
+      let last;
+      for(let i=0;i<tries;i++){
+        try{ return await fn(); }
+        catch(e){
+          last=e;
+          const st=e?.status||0;
+          if(st===429 || st===503 || st===502 || e?.name==='AbortError'){
+            await new Promise(r=>setTimeout(r, 400 + i*700));
+            continue;
+          }
+          throw e;
+        }
+      }
+      throw last;
+    };
+
+    const searchWikimedia=async(searchTerm,targetKind,maxItems=60)=>{
       const collected=[]; const seenPages=new Set(); let continuation=null;
-      for(let page=0;page<4 && collected.length<maxItems;page++){
+      const fileFilter = targetKind==='video'
+        ? 'filetype:video OR filetype:ogg'
+        : 'filetype:bitmap OR filetype:drawing OR filetype:image';
+      const term = `(${searchTerm}) ${fileFilter}`;
+      for(let page=0; page<3 && collected.length<maxItems; page++){
         const api=new URL('https://commons.wikimedia.org/w/api.php');
         for(const [k,v] of [
           ['action','query'],['format','json'],['formatversion','2'],['generator','search'],
-          ['gsrsearch',searchTerm],['gsrnamespace','6'],['gsrlimit','100'],['gsrwhat','text'],
-          ['prop','imageinfo'],['iiprop','url|mime|size'],['iiurlwidth','900'],['origin','*']
+          ['gsrsearch',term],['gsrnamespace','6'],['gsrlimit','50'],['gsrwhat','text'],
+          ['prop','imageinfo'],['iiprop','url|mime|size|thumbmime'],['iiurlwidth','900'],['origin','*']
         ]) api.searchParams.set(k,v);
         if(continuation) api.searchParams.set('gsrcontinue',continuation);
-        const d=await fetchJson(api,{headers:{'User-Agent':'Festival-of-Bharat-Reel-Maker/1.3','Accept':'application/json'}},8000);
+        const d=await withRetry(()=>fetchJson(api,{
+          headers:{
+            'User-Agent':'Festival-of-Bharat-Reel-Maker/1.4 (https://festivalofbharat; media research; contact via app)',
+            'Accept':'application/json'
+          }
+        },10000));
         for(const x of (d?.query?.pages||[])){
-          const z=x?.imageinfo?.[0],mime=String(z?.mime||'').toLowerCase();
+          const z=x?.imageinfo?.[0], mime=String(z?.mime||'').toLowerCase();
           const kind=mime.startsWith('image/')?'image':mime.startsWith('video/')?'video':'';
-          if(kind!==targetKind||!z?.url||seenPages.has(x.pageid))continue;
+          if(kind!==targetKind || !z?.url || seenPages.has(x.pageid)) continue;
           seenPages.add(x.pageid);
-          collected.push({id:(kind==='video'?'wmv':'wm')+x.pageid,title:x.title||('Wikimedia Commons '+kind),source:'Wikimedia Commons',url:(kind==='image'&&z.thumburl)?z.thumburl:z.url,originalUrl:z.url,thumb:z.thumburl||z.url||'',kind});
-          if(collected.length>=maxItems)break;
+          const thumb = z.thumburl || (kind==='image' ? z.url : '');
+          collected.push({
+            id:(kind==='video'?'wmv':'wm')+x.pageid,
+            title:(x.title||'').replace(/^File:/,'').replace(/\.[^.]+$/,'' ) || ('Wikimedia '+kind),
+            source:'Wikimedia Commons',
+            url: kind==='image' && z.thumburl ? z.thumburl : z.url,
+            originalUrl:z.url,
+            thumb: thumb || z.url || '',
+            kind
+          });
+          if(collected.length>=maxItems) break;
         }
         continuation=d?.continue?.gsrcontinue||null;
-        if(!continuation)break;
+        if(!continuation) break;
       }
       return collected;
     };
 
-    const [photoAttempt,videoAttempt]=await Promise.allSettled([
-      searchWikimedia(q,'image',100),
-      searchWikimedia(q,'video',100)
-    ]);
-    const consume=(attempt)=>{if(attempt.status==='fulfilled')for(const x of attempt.value||[])add(x)};
-    consume(photoAttempt); consume(videoAttempt);
-    if(photoAttempt.status==='rejected')errors.push('Wikimedia photos: '+String(photoAttempt.reason?.message||photoAttempt.reason));
-    if(videoAttempt.status==='rejected')errors.push('Wikimedia videos: '+String(videoAttempt.reason?.message||videoAttempt.reason));
+    const searchOpenverseImages=async(searchTerm,maxItems=80)=>{
+      const collected=[];
+      const queries=[searchTerm];
+      if(!/\b(india|indian|bharat)\b/i.test(searchTerm)) queries.push(searchTerm+' india');
+      for(const term of queries){
+        if(collected.length>=maxItems) break;
+        try{
+          const api=new URL('https://api.openverse.org/v1/images/');
+          api.searchParams.set('q',term);
+          api.searchParams.set('page_size',String(Math.min(40, maxItems-collected.length)));
+          api.searchParams.set('page','1');
+          const d=await withRetry(()=>fetchJson(api,{
+            headers:{'User-Agent':'Festival-of-Bharat-Reel-Maker/1.4','Accept':'application/json'}
+          },12000));
+          for(const x of (d?.results||[])){
+            if(!x?.url) continue;
+            collected.push({
+              id:'ovi'+x.id,title:x.title||'Untitled',source:'Openverse',
+              url:x.url,originalUrl:x.url,thumb:x.thumbnail||x.url,kind:'image'
+            });
+            if(collected.length>=maxItems) break;
+          }
+        }catch(e){ errors.push('Openverse images ('+term+'): '+String(e.message||e)); }
+      }
+      return collected;
+    };
 
-    if(!results.some(x=>x.kind==='image')){
+    const searchOpenverseVideos=async(searchTerm,maxItems=40)=>{
+      const collected=[];
       try{
-        const api=new URL('https://api.openverse.org/v1/images/');
-        api.searchParams.set('q',q); api.searchParams.set('page_size','100');
-        api.searchParams.set('size','large'); api.searchParams.set('license_type','commercial,modification');
-        const d=await fetchJson(api,{headers:{'User-Agent':'Festival-of-Bharat-Reel-Maker/1.2','Accept':'application/json'}},10000);
-        for(const x of (d?.results||[])) if(x?.url) add({
-          id:'ov'+x.id,title:x.title||'Untitled',source:'Openverse',
-          url:x.url,thumb:x.thumbnail||x.url,kind:'image'
-        });
-      }catch(e){errors.push('Openverse photos: '+String(e.message||e))}
-    }
+        const api=new URL('https://api.openverse.org/v1/videos/');
+        api.searchParams.set('q',searchTerm);
+        api.searchParams.set('page_size',String(Math.min(20, maxItems)));
+        api.searchParams.set('page','1');
+        const d=await fetchJson(api,{
+          headers:{'User-Agent':'Festival-of-Bharat-Reel-Maker/1.4','Accept':'application/json'}
+        },8000);
+        for(const x of (d?.results||[])){
+          const mediaUrl=x.url || (x.files&&x.files[0]&&x.files[0].url) || null;
+          if(!mediaUrl) continue;
+          collected.push({
+            id:'ovv'+x.id,title:x.title||'Untitled video',source:'Openverse',
+            url:mediaUrl,originalUrl:mediaUrl,thumb:x.thumbnail||'',kind:'video'
+          });
+          if(collected.length>=maxItems) break;
+        }
+      }catch(e){
+        if(e?.status && e.status!==404) errors.push('Openverse videos: '+String(e.message||e).slice(0,120));
+      }
+      return collected;
+    };
 
-    const photos=results.filter(x=>x.kind==='image').slice(0,100);
-    const videos=results.filter(x=>x.kind==='video').slice(0,100);
+    const searchGoogleImages=async(searchTerm,maxItems=20)=>{
+      const key=process.env.GOOGLE_CSE_KEY||'', cx=process.env.GOOGLE_CSE_ID||'';
+      if(!key||!cx) return [];
+      try{
+        const api=new URL('https://www.googleapis.com/customsearch/v1');
+        for(const [k,v] of [
+          ['key',key],['cx',cx],['q',searchTerm],['searchType','image'],
+          ['num',String(Math.min(10,maxItems))],['safe','active'],['imgSize','large']
+        ]) api.searchParams.set(k,v);
+        const d=await withRetry(()=>fetchJson(api,{},10000));
+        return (d?.items||[]).filter(x=>x?.link).map((x,i)=>({
+          id:'gimg'+i+'-'+Buffer.from(x.link).toString('base64').slice(0,12),
+          title:x.title||'Google Image',source:'Google Images',url:x.link,
+          originalUrl:x.link,thumb:x.image?.thumbnailLink||x.link,kind:'image'
+        }));
+      }catch(e){ errors.push('Google images: '+String(e.message||e)); return []; }
+    };
+
+    const [wmPhotos,wmVideos,ovPhotos,ovVideos,gPhotos]=await Promise.all([
+      searchWikimedia(q,'image',60).catch(e=>{errors.push('Wikimedia photos: '+String(e.message||e));return[];}),
+      searchWikimedia(q,'video',40).catch(e=>{errors.push('Wikimedia videos: '+String(e.message||e));return[];}),
+      searchOpenverseImages(q,80).catch(e=>{errors.push('Openverse photos: '+String(e.message||e));return[];}),
+      searchOpenverseVideos(q,40).catch(e=>{errors.push('Openverse videos: '+String(e.message||e));return[];}),
+      searchGoogleImages(q,20).catch(e=>{errors.push('Google images: '+String(e.message||e));return[];})
+    ]);
+
+    for(const list of [wmPhotos,ovPhotos,gPhotos,wmVideos,ovVideos]) for(const x of list) add(x);
+
+    const photos=results.filter(x=>x.kind==='image').slice(0,120);
+    const videos=results.filter(x=>x.kind==='video').slice(0,60);
     const finalResults=[...photos,...videos];
+
     if(!finalResults.length) return send(res,502,{'Content-Type':'application/json','Cache-Control':'no-store'},
-      JSON.stringify({error:'No media found',details:errors}));
+      JSON.stringify({error:'No media found for this topic. Try a broader term (e.g. festival name, city, or "temple").',details:errors,query:q}));
+
     return send(res,200,{'Content-Type':'application/json','Cache-Control':'no-store'},
       JSON.stringify({
         results:finalResults,
-        source:videos.length?'Wikimedia Commons':'Wikimedia Commons / Openverse',
+        source:[
+          photos.some(x=>x.source==='Wikimedia Commons')||videos.some(x=>x.source==='Wikimedia Commons')?'Wikimedia':'',
+          photos.some(x=>x.source==='Openverse')||videos.some(x=>x.source==='Openverse')?'Openverse':'',
+          photos.some(x=>x.source==='Google Images')?'Google':''
+        ].filter(Boolean).join(' + ') || 'Open sources',
         counts:{
           wikimedia:results.filter(x=>x.source==='Wikimedia Commons').length,
           openverse:results.filter(x=>x.source==='Openverse').length,
+          google:results.filter(x=>x.source==='Google Images').length,
           photos:photos.length,videos:videos.length
         },errors
       }));
   }
-
   if(u.pathname==='/music-search'){
     const q=u.searchParams.get('q')||'';
     if(!q.trim()) return send(res,400,{'Content-Type':'application/json'},JSON.stringify({error:'Missing query'}));
