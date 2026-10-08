@@ -399,5 +399,14 @@ const server=createServer(async(req,res)=>{
   }
   send(res,404,{'Content-Type':'text/plain'},'Not found');
 });
-const port=Number(process.env.PORT||4173);
-server.listen(port,'0.0.0.0',()=>console.log('Festival of Bharat Reel Maker listening on '+port));
+const port=Number.parseInt(process.env.PORT||'10000',10);
+if(!Number.isFinite(port)||port<1||port>65535) throw new Error('Invalid PORT: '+process.env.PORT);
+server.on('error',error=>{ console.error('HTTP server error:',error); process.exitCode=1; });
+const shutdown=signal=>{
+  console.log('Received '+signal+', shutting down');
+  server.close(()=>process.exit(0));
+  setTimeout(()=>process.exit(0),8000).unref();
+};
+process.on('SIGTERM',()=>shutdown('SIGTERM'));
+process.on('SIGINT',()=>shutdown('SIGINT'));
+server.listen({port,host:'0.0.0.0'},()=>console.log('Festival of Bharat Reel Maker listening on 0.0.0.0:'+port));
