@@ -109,10 +109,44 @@
 <script>
 const $=id=>document.getElementById(id),selected=[],results=[];let playing=false,raf=0,started=0,activeVideo=null,audioObj=null,audioURL=null,audioCtx=null,audioSource=null,audioDest=null;
 const proxy=u=>{if(!u)return '';if(/^\/proxy\?url=/.test(u))return u;return '/proxy?url='+encodeURIComponent(u)},esc=s=>String(s||'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
-const templateNames=["Cinematic Dawn","Temple Glow","Heritage Frames","Golden Hour","Divine Light","Festival Pulse","Sacred Journey","Royal Bharat","Minimal Story","Documentary Flow","Colour Burst","Soft Darshan","Ancient Streets","Modern India","Aarti Moments","Crowd Energy","Slow Reveal","Photo Journal","Temple Details","Cultural Rhythm","Sunrise Story","Marigold Motion","Fortress Film","Devotion Edit","Indian Texture","Celebration Cut","Quiet Faith","Travel Bharat","Editorial Frames","People of Bharat","Divine Portrait","Festival Diary","Heritage Walk","Ritual Cinema","Monsoon India","Fast Celebration","Meditative India","Craft Story","Sacred Architecture","Bold Bharat","Tradition Today","Temple Cinema","Colour Journal","History in Motion","Joyful Bharat","Slow Cinema","Festival Frames","Faith & Fire","India Unfolded","Bharat Finale"];
-const templateDesigns=["Minimal Type","Polaroid Stack","Film Strip","Editorial Split","Bold Statement","Soft Journal","Retro Analog","Collage Grid","Luxury Serif","Modern Blocks","Kinetic Caption","Photo Dump","Magazine Cover","Travel Diary","Black White","Ripped Paper","Doodle Notes","Neon Edge","Clean Quote","Split Screen","Vintage Frame","Gradient Poster","Vertical Label","Festival Cards","Classic Cinema","News Flash","Memory Album","Type + Image","Sacred Frame","Dynamic Crop"];
-const speedSets=[{cat:'Slow',dur:[24,26,28,30,32],motion:['slow-push','pan','reveal'],transition:['fade','crossfade']},{cat:'Fast',dur:[8,9,10,11,12],motion:['beat-cut','push-pan'],transition:['flash','crossfade']},{cat:'Mixed',dur:[14,16,18,20,22],motion:['push-pan','reveal','pan','beat-cut'],transition:['crossfade','fade','flash']}];
-const templates=speedSets.flatMap((set,si)=>templateNames.map((base,i)=>{const design=templateDesigns[(si*50+i)%templateDesigns.length];const dur=set.dur[i%set.dur.length];const motion=set.motion[(i+si)%set.motion.length];const transition=set.transition[(i+si)%set.transition.length];const scenes=si===0?[['OPEN','Atmosphere'],['HERO','Main moment'],['DETAIL','Detail'],['MOTION','Movement'],['PEAK','Highlight'],['END','Meaning']]:si===1?[['HOOK','Hook'],['FAST','Cut'],['FAST','Detail'],['FAST','Movement'],['PEAK','Peak'],['END','CTA']]:[['OPEN','Set the scene'],['HERO','Hero'],['FAST','Energy'],['DETAIL','Detail'],['PEAK','Payoff'],['END','Close']];return {name:base+' · '+design+' · '+set.cat+' '+String(i+1).padStart(2,'0'),cat:set.cat,dur,mix:50,desc:design+' design · '+set.cat+' pacing · real moving-video preview · '+motion.replace('-',' '),scenes,motion,transition,speed:set.cat.toLowerCase(),design};}));
+const templateCatalog=[
+ {name:'Cinematic Dawn',layout:'cinematic',cat:'Slow',dur:24,motion:'slow-push',transition:'fade',desc:'Full-bleed cinematic frame with letterbox, title reveal and controlled push.'},
+ {name:'Cinematic Focus',layout:'focus',cat:'Slow',dur:26,motion:'reveal',transition:'crossfade',desc:'Subject-focused composition with a controlled spotlight and lower title.'},
+ {name:'Cinematic Journey',layout:'journey',cat:'Slow',dur:28,motion:'pan',transition:'fade',desc:'Vertical travel-film composition with route marker, image window and footer.'},
+ {name:'Editorial Split',layout:'editorial',cat:'Slow',dur:20,motion:'pan',transition:'crossfade',desc:'Magazine-style 60/40 split with text column and image panel.'},
+ {name:'Editorial Column',layout:'column',cat:'Slow',dur:22,motion:'reveal',transition:'fade',desc:'Tall image column with oversized editorial headline and rule system.'},
+ {name:'Magazine Cover',layout:'magazine',cat:'Slow',dur:18,motion:'slow-push',transition:'crossfade',desc:'Real magazine-cover hierarchy with masthead, image and cover lines.'},
+ {name:'Polaroid Stack',layout:'polaroid',cat:'Slow',dur:24,motion:'reveal',transition:'fade',desc:'Layered photographic print with offset card and handwritten-style caption.'},
+ {name:'Film Strip',layout:'filmstrip',cat:'Slow',dur:26,motion:'pan',transition:'crossfade',desc:'35mm film-frame treatment with sprocket holes and frame counter.'},
+ {name:'Memory Diary',layout:'diary',cat:'Slow',dur:28,motion:'slow-push',transition:'fade',desc:'Scrapbook page with tape, paper card and journal caption.'},
+ {name:'Collage Grid',layout:'collage',cat:'Mixed',dur:16,motion:'push-pan',transition:'flash',desc:'Four selected assets arranged as a true asymmetrical collage.'},
+ {name:'Dynamic Grid',layout:'grid',cat:'Mixed',dur:15,motion:'beat-cut',transition:'crossfade',desc:'Modular 2x2 grid with alternating crop scales and strong labels.'},
+ {name:'Triptych Story',layout:'triptych',cat:'Mixed',dur:18,motion:'pan',transition:'crossfade',desc:'Three vertical image panels creating a story-board composition.'},
+ {name:'Diagonal Motion',layout:'diagonal',cat:'Mixed',dur:14,motion:'push-pan',transition:'flash',desc:'Angled image window with kinetic diagonal bands.'},
+ {name:'Bold Statement',layout:'bold',cat:'Fast',dur:10,motion:'beat-cut',transition:'flash',desc:'Huge headline, full-bleed media and hard graphic framing.'},
+ {name:'Kinetic Caption',layout:'kinetic',cat:'Fast',dur:9,motion:'beat-cut',transition:'flash',desc:'Caption-led layout with oversized word block and moving image.'},
+ {name:'Festival Pulse',layout:'pulse',cat:'Fast',dur:8,motion:'beat-cut',transition:'flash',desc:'High-energy festival card with circular pulse graphics and hard cuts.'},
+ {name:'Neon Edge',layout:'neon',cat:'Fast',dur:11,motion:'push-pan',transition:'flash',desc:'Dark full-frame media with luminous edge rails and compact type.'},
+ {name:'News Flash',layout:'news',cat:'Fast',dur:9,motion:'beat-cut',transition:'flash',desc:'Breaking-news inspired cultural card with headline strip and ticker.'},
+ {name:'Photo Wall',layout:'wall',cat:'Fast',dur:12,motion:'beat-cut',transition:'crossfade',desc:'Layered photo-wall composition using multiple explicitly selected assets.'},
+ {name:'Sacred Frame',layout:'sacred',cat:'Slow',dur:30,motion:'slow-push',transition:'fade',desc:'Centered devotional composition with arch frame and restrained typography.'},
+ {name:'Temple Light',layout:'temple',cat:'Slow',dur:32,motion:'reveal',transition:'fade',desc:'Temple-window framing with top light shaft and devotional footer.'},
+ {name:'Devotional Story',layout:'devotional',cat:'Slow',dur:28,motion:'slow-push',transition:'crossfade',desc:'Quiet devotional card with centered portrait window and mantra line.'},
+ {name:'Heritage Documentary',layout:'documentary',cat:'Mixed',dur:20,motion:'pan',transition:'crossfade',desc:'Documentary frame with archival border, date marker and source-style caption.'},
+ {name:'History in Motion',layout:'history',cat:'Mixed',dur:18,motion:'reveal',transition:'fade',desc:'Timeline composition with image panel, year marker and progress rule.'},
+ {name:'Culture Journal',layout:'culture',cat:'Mixed',dur:22,motion:'pan',transition:'crossfade',desc:'Editorial culture page with side note, image and structured footer.'},
+ {name:'Minimal Modern',layout:'minimal',cat:'Mixed',dur:16,motion:'slow-push',transition:'fade',desc:'Clean gallery composition with large negative space and small type.'},
+ {name:'Clean Quote',layout:'quote',cat:'Slow',dur:18,motion:'reveal',transition:'fade',desc:'Image framed as a quiet quote card with centered statement.'},
+ {name:'Black & White',layout:'mono',cat:'Slow',dur:20,motion:'pan',transition:'crossfade',desc:'Monochrome-style framing with stark side title and image window.'},
+ {name:'Heritage Frames',layout:'heritage',cat:'Slow',dur:26,motion:'slow-push',transition:'fade',desc:'Ornamental heritage frame with inset image and archival caption.'},
+ {name:'Bharat Finale',layout:'finale',cat:'Fast',dur:12,motion:'beat-cut',transition:'flash',desc:'Closing poster composition with oversized title, image and final mark.'}
+];
+const speedMeta={Slow:{dur:[24,26,28,30],speed:'slow'},Mixed:{dur:[14,16,18,20],speed:'mixed'},Fast:{dur:[8,9,10,12],speed:'fast'}};
+const templates=templateCatalog.map((t,i)=>({...t,mix:50,speed:t.cat.toLowerCase(),design:t.layout,scenes:
+ t.cat==='Fast'?[['HOOK','Hook'],['FAST','Cut'],['FAST','Detail'],['PEAK','Peak'],['END','CTA']]:
+ t.cat==='Mixed'?[['OPEN','Set the scene'],['HERO','Hero'],['DETAIL','Detail'],['FAST','Energy'],['PEAK','Payoff'],['END','Close']]:
+ [['OPEN','Atmosphere'],['HERO','Main moment'],['DETAIL','Detail'],['MOTION','Movement'],['PEAK','Highlight'],['END','Meaning']]
+}));
 let activeTemplate=templates[0],templateCat='All',templateSearch='',sequence=[],renderToken=0;
 function update(){ $('photoCount').textContent=results.filter(x=>x.kind==='image').length;$('videoCount').textContent=results.filter(x=>x.kind==='video').length;$('selectedCount').textContent=selected.length;$('mixVal').textContent=(100-+$('mix').value)+' / '+$('mix').value; }
 let mediaTab='photos';
@@ -219,8 +253,8 @@ window.previewTemplate=previewTemplate;
 function renderTemplates(){
  const tabs=$('templateTabs'),list=$('templateList');
  if(!tabs||!list)return;
- const cats=['All','Slow','Fast','Mixed'];
- tabs.innerHTML=cats.map(x=>'<button type="button" class="tab '+(templateCat===x?'active':'')+'" onclick="setCat(\''+x+'\')">'+x+' <span style="opacity:.65">('+ (x==='All'?150:50) +')</span></button>').join('');
+ const cats=['All','Slow','Mixed','Fast'];
+ tabs.innerHTML=cats.map(x=>'<button type="button" class="tab '+(templateCat===x?'active':'')+'" onclick="setCat(\''+x+'\')">'+x+' <span style="opacity:.65">('+ (x==='All'?30:templates.filter(t=>t.cat===x).length) +')</span></button>').join('');
  const query=String($('templateSearch')?.value||'').trim().toLowerCase();
  const filtered=templates.map((t,i)=>({t,i})).filter(({t})=>{
    const catOk=templateCat==='All'||t.cat===templateCat;
@@ -458,91 +492,134 @@ async function draw(t,captureFrame=false){
      }catch{}
    }
 async function renderTemplateMedia(ctx,media,scene,local,idx,slot,captureFrame){
- const design=String(activeTemplate?.design||'Minimal Type');
- const box=(x,y,w,h,zoom=1,ox=0,oy=0,rotation=0)=>{ctx.save();ctx.beginPath();ctx.rect(x,y,w,h);ctx.clip();ctx.translate(x,y);fit(ctx,media,w,h,zoom,ox,oy,rotation);ctx.restore()};
- const panel=(x,y,w,h,fill)=>{ctx.fillStyle=fill;ctx.fillRect(x,y,w,h)};
- const editorial=['Editorial Split','Magazine Cover','News Flash','Vertical Label','Travel Diary'].includes(design);
- const frame=['Polaroid Stack','Film Strip','Vintage Frame','Sacred Frame','Classic Cinema'].includes(design);
- const bold=['Bold Statement','Kinetic Caption','Neon Edge','Gradient Poster','Dynamic Crop'].includes(design);
- const journal=['Soft Journal','Retro Analog','Photo Dump','Doodle Notes','Memory Album'].includes(design);
- const grid=['Collage Grid','Modern Blocks','Split Screen','Festival Cards','Type + Image'].includes(design);
- if(editorial){
-   if(design==='Editorial Split'){panel(0,0,1080,1920,'#0d1014');box(390,0,690,1920,1.05,px,py,rot)}
-   else if(design==='Magazine Cover'){box(0,0,1080,1320,1.03,px,py,rot);panel(0,1320,1080,600,'rgba(245,240,230,.96)')}
-   else if(design==='News Flash'){panel(0,0,1080,250,'#080a0c');box(0,230,1080,1180,1.06,px,py,rot);panel(0,1410,1080,510,'rgba(180,35,30,.94)')}
-   else if(design==='Vertical Label'){panel(0,0,1080,1920,'#090b0e');box(80,0,920,1920,1.08,px,py,rot);panel(0,0,80,1920,'#080a0c');panel(1000,0,80,1920,'#080a0c')}
-   else {box(0,260,1080,1320,1.08,px,py,rot);panel(0,0,1080,310,'rgba(8,10,12,.92)');panel(0,1580,1080,340,'rgba(8,10,12,.88)')}
- }else if(frame){
-   if(design==='Polaroid Stack'){
-     panel(0,0,1080,1920,'#151515');ctx.save();ctx.translate(540,950);ctx.rotate(-.025);ctx.fillStyle='#f4f0e8';ctx.fillRect(-425,-610,850,1220);ctx.save();ctx.beginPath();ctx.rect(-395,-575,790,930);ctx.clip();ctx.translate(-395,-465);fit(ctx,media,790,930,1.05,px,py,0);ctx.restore();ctx.restore()
-   }else if(design==='Film Strip'){
-     panel(0,0,1080,1920,'#090909');box(95,210,890,1500,1.03,px,py,rot);ctx.fillStyle='#050505';ctx.fillRect(0,0,1080,170);ctx.fillRect(0,1750,1080,170);for(let y=32;y<1880;y+=95){ctx.fillStyle='#ddd';ctx.fillRect(18,y,48,58);ctx.fillRect(1014,y,48,58)}
-   }else{
-     panel(0,0,1080,1920,design==='Sacred Frame'?'#0e1013':'#111');box(70,95,940,1580,1.05,px,py,rot);ctx.strokeStyle=design==='Sacred Frame'?'rgba(225,205,155,.9)':'rgba(255,255,255,.85)';ctx.lineWidth=10;ctx.strokeRect(48,72,984,1625)
-   }
- }else if(bold){
-   box(0,0,1080,1920,1.08,px,py,rot);panel(0,0,1080,330,'rgba(0,0,0,.64)');
-   if(design==='Dynamic Crop'){panel(0,0,1080,1920,'#0b0d10');box(70,260,940,1250,1.22,px*1.5,py*1.5,rot)}
-   if(design==='Neon Edge'){ctx.strokeStyle='rgba(255,255,255,.9)';ctx.lineWidth=7;ctx.strokeRect(28,28,1024,1864)}
- }else if(journal){
-   panel(0,0,1080,1920,'#e8e0d1');box(75,190,930,1260,1.04,px,py,rot);panel(55,1490,970,300,'rgba(248,243,232,.98)');ctx.strokeStyle='rgba(40,35,28,.35)';ctx.lineWidth=2;ctx.strokeRect(55,1490,970,300)
- }else if(grid){
-   panel(0,0,1080,1920,'#0b0d10');const gap=18,x=50,y=170,w=480,h=760;box(x,y,w,h,1.08,px,py,rot);box(x+w+gap,y,w,h,1.08,-px,-py,-rot);box(x,y+h+gap,w,h,1.12,py,px,rot);box(x+w+gap,y+h+gap,w,h,1.08,-py,-px,-rot)
- }else{box(0,0,1080,1920,1.04,px,py,rot)}
-}
-
-   await renderTemplateMedia(ctx,media,scene,local,idx,slot,captureFrame);
-   if(activeTemplate.transition==='fade'&&local<.14){ctx.fillStyle='rgba(0,0,0,'+((.14-local)/.14)+')';ctx.fillRect(0,0,c.width,c.height)}
-   if(activeTemplate.transition==='flash'&&local<.07){ctx.fillStyle='rgba(255,255,255,'+((.07-local)/.07*.35)+')';ctx.fillRect(0,0,c.width,c.height)}
-   overlay(ctx,idx,scene.label);
-   $('bar').style.width=(raw/dur*100)+'%';
- }catch(e){
-   ctx.fillStyle='#111';ctx.fillRect(0,0,c.width,c.height);
-   ctx.fillStyle='#ffcc80';ctx.font='40px Arial';ctx.textAlign='center';ctx.fillText('Media could not be previewed',540,900);
-   ctx.font='28px Arial';ctx.fillText(a?.source||'Unknown source',540,960);ctx.textAlign='left';
-   const detail=String(e?.message||e||'Unknown media error');
-   $('qc').textContent='QC: Media preview failed — '+detail.slice(0,320);
-   console.error('FOB media render failure', {asset:a, error:e});
-   return false;
+ const layout=String(activeTemplate?.layout||'minimal');
+ const W=ctx.canvas.width,H=ctx.canvas.height;
+ const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
+ const rect=async(asset,x,y,w,h,z=1,ox=0,oy=0,rot=0)=>{
+   if(!asset)return;
+   const m=asset.kind==='video'?await loadVideo(asset):await loadImage(asset.playUrl||asset.url||asset.thumbPlay);
+   ctx.save();ctx.beginPath();ctx.rect(x,y,w,h);ctx.clip();ctx.translate(x,y);fit(ctx,m,w,h,z,ox,oy,rot);ctx.restore();
+ };
+ const card=(x,y,w,h,fill='rgba(255,255,255,.92)',r=0)=>{
+   ctx.save();ctx.fillStyle=fill;
+   if(r){ctx.beginPath();ctx.roundRect(x,y,w,h,r);ctx.fill()}else ctx.fillRect(x,y,w,h);
+   ctx.restore();
+ };
+ const line=(x1,y1,x2,y2,width=4,fill='#fff')=>{ctx.save();ctx.strokeStyle=fill;ctx.lineWidth=width;ctx.beginPath();ctx.moveTo(x1,y1);ctx.lineTo(x2,y2);ctx.stroke();ctx.restore()};
+ const circle=(x,y,r,fill)=>{ctx.save();ctx.fillStyle=fill;ctx.beginPath();ctx.arc(x,y,r,0,Math.PI*2);ctx.fill();ctx.restore()};
+ const assets=selected.length?selected:[media];
+ const at=n=>assets[n%assets.length]||media;
+ ctx.clearRect(0,0,W,H);
+ card(0,0,W,H,'#090a0c');
+ if(layout==='cinematic'){
+   await rect(media,0,170,W,H-340,1.08,0,local*4);
+   card(0,0,W,170,'#070809');card(0,H-170,W,170,'#070809');line(54,H-112,W-54,H-112,2,'rgba(255,255,255,.5)');
+ }else if(layout==='focus'){
+   await rect(media,70,190,W-140,H-500,1.12,0,local*8);
+   card(0,0,W,190,'#111214');card(0,H-310,W,310,'rgba(10,10,12,.94)');circle(W/2,105,30,'rgba(255,255,255,.12)');
+ }else if(layout==='journey'){
+   card(0,0,W,220,'#e9e1d3');await rect(media,75,285,W-150,980,1.04,local*6);
+   card(0,1320,W,500,'#111214');line(75,1410,W-75,1410,3,'#d6c7ad');circle(105,1410,14,'#d6c7ad');circle(W-105,1410,14,'#d6c7ad');
+ }else if(layout==='editorial'){
+   card(0,0,W,H,'#ece7de');await rect(media,420,0,W-420,H,1.08,local*5);
+   card(0,0,420,H,'#ece7de');line(55,270,360,270,5,'#171717');line(55,1660,360,1660,2,'#777');
+ }else if(layout==='column'){
+   await rect(media,120,0,650,H,1.12,local*5);card(770,0,W-770,H,'#111214');line(820,230,W-80,230,3,'#aaa');line(820,1510,W-80,1510,3,'#aaa');
+ }else if(layout==='magazine'){
+   await rect(media,0,180,W,1050,1.05,local*5);card(0,0,W,180,'#f0e8da');card(0,1230,W,630,'#f0e8da');line(50,1300,W-50,1300,2,'#171717');
+ }else if(layout==='polaroid'){
+   await rect(at(idx+1),0,0,W,H,.9);ctx.save();ctx.translate(W/2,H/2+10);ctx.rotate(-.045);card(-430,-650,860,1330,'#f4efe5',18);ctx.restore();
+   ctx.save();ctx.translate(W/2,H/2-30);ctx.rotate(.025);card(-390,-610,780,1130,'#fff',14);await rect(media,W/2-360,H/2-575,720,780,1.02,local*3);ctx.restore();
+ }else if(layout==='filmstrip'){
+   card(0,0,W,H,'#151515');for(let y=35;y<H;y+=135)card(0,y,W,82,'#050505');
+   await rect(media,70,250,W-140,1180,1.05,local*5);for(let y=30;y<H;y+=95){card(15,y,32,48,'#ddd',4);card(W-47,y,32,48,'#ddd',4)}
+ }else if(layout==='diary'){
+   card(0,0,W,H,'#d8cbb9');await rect(media,70,150,W-140,1020,1.04,local*4);card(55,1260,W-110,430,'#f4eee4',16);
+   card(100,105,190,44,'#c9b79c',7);
+ }else if(layout==='collage'){
+   await rect(at(idx),45,45,510,820,1.08,local*4);await rect(at(idx+1),575,45,505,470,1.05,local*5);
+   await rect(at(idx+2),575,535,505,650,1.1,local*6);await rect(at(idx+3),45,895,510,820,1.05,local*7);
+   card(45,1740,1035,90,'#111214');
+ }else if(layout==='grid'){
+   const gap=18;const w=(W-gap*3)/2,h=(H-430-gap*3)/2;const ys=[120,120+h+gap];
+   await rect(at(idx),gap,ys[0],w,h,1.08,local*5);await rect(at(idx+1),gap*2+w,ys[0],w,h,1.05,local*4);
+   await rect(at(idx+2),gap,ys[1],w,h,1.12,local*6);await rect(at(idx+3),gap*2+w,ys[1],w,h,1.02,local*3);card(0,H-360,W,360,'#101114');
+ }else if(layout==='triptych'){
+   const gap=12,w=(W-gap*4)/3;for(let j=0;j<3;j++)await rect(at(idx+j),gap+j*(w+gap),80,w,H-360,1.12,local*(j+3));card(0,H-260,W,260,'#f1eadf');
+ }else if(layout==='diagonal'){
+   ctx.save();ctx.beginPath();ctx.moveTo(0,260);ctx.lineTo(W,0);ctx.lineTo(W,H-280);ctx.lineTo(0,H);ctx.closePath();ctx.clip();await rect(media,0,0,W,H,1.08,local*8);ctx.restore();
+   card(0,0,W,110,'#101114');card(0,H-110,W,110,'#101114');line(0,270,W,15,8,'#e8dfd0');
+ }else if(layout==='bold'){
+   await rect(media,0,0,W,H,1.12,local*10);card(0,0,W,230,'rgba(0,0,0,.76)');card(0,H-260,W,260,'rgba(0,0,0,.82)');
+ }else if(layout==='kinetic'){
+   await rect(media,0,0,W,H,1.16,local*12);card(40,330,W-80,620,'rgba(8,8,10,.78)',24);line(65,330,W-65,330,10,'#fff');line(65,950,W-65,950,10,'#fff');
+ }else if(layout==='pulse'){
+   await rect(media,0,0,W,H,1.15,local*12);for(let r=120;r<600;r+=120)circle(W/2,H/2,r,'rgba(255,255,255,.025)');card(50,70,300,70,'#111214',12);card(50,H-180,W-100,110,'#111214',12);
+ }else if(layout==='neon'){
+   await rect(media,0,0,W,H,1.13,local*10);line(40,40,40,H-40,8,'#fff');line(W-40,40,W-40,H-40,8,'#fff');card(80,H-330,W-160,220,'rgba(5,5,8,.84)',18);
+ }else if(layout==='news'){
+   await rect(media,0,170,W,H-570,1.08,local*8);card(0,0,W,170,'#b72b2b');card(0,H-400,W,400,'#f0ece4');line(0,H-400,W,H-400,12,'#b72b2b');
+ }else if(layout==='wall'){
+   card(0,0,W,H,'#d8d2c7');await rect(at(idx),55,110,500,720,1.08,local*3);await rect(at(idx+1),540,55,500,680,1.05,local*4);await rect(at(idx+2),110,790,500,760,1.1,local*5);await rect(at(idx+3),585,735,420,800,1.08,local*6);card(60,1630,940,170,'#f5f0e7',12);
+ }else if(layout==='sacred'){
+   await rect(media,95,170,W-190,1210,1.08,local*4);card(0,0,W,170,'#111214');card(0,1390,W,470,'#0f1012');
+   ctx.save();ctx.strokeStyle='rgba(255,255,255,.6)';ctx.lineWidth=5;ctx.beginPath();ctx.arc(W/2,760,560,Math.PI,0);ctx.stroke();ctx.restore();
+ }else if(layout==='temple'){
+   await rect(media,90,240,W-180,1120,1.1,local*4);card(0,0,W,240,'#171310');card(0,1360,W,500,'#171310');
+   for(let x=0;x<W;x+=95)line(x,0,x+120,240,3,'rgba(230,190,100,.12)');
+ }else if(layout==='devotional'){
+   await rect(media,130,230,W-260,1040,1.08,local*4);card(0,0,W,230,'#121114');card(0,1270,W,590,'#121114');
+   circle(W/2,110,48,'rgba(255,255,255,.1)');line(130,1370,W-130,1370,2,'rgba(255,255,255,.35)');
+ }else if(layout==='documentary'){
+   await rect(media,70,150,W-140,1200,1.05,local*4);card(0,0,W,150,'#d6d0c4');card(0,1350,W,510,'#171717');line(70,1450,W-70,1450,3,'#b5aa96');
+ }else if(layout==='history'){
+   card(0,0,W,H,'#ded6c8');await rect(media,90,180,720,980,1.05,local*4);line(850,210,850,1620,5,'#282521');for(let y=260;y<1600;y+=220)circle(850,y,14,'#282521');card(90,1230,720,450,'#24211e');
+ }else if(layout==='culture'){
+   card(0,0,W,H,'#eee8dc');await rect(media,55,210,W-110,960,1.05,local*5);card(55,1240,W-110,520,'#181719',14);line(55,180,W-55,180,3,'#181719');
+ }else if(layout==='minimal'){
+   await rect(media,80,230,W-160,1080,1.03,local*3);line(80,1400,W-80,1400,2,'#ddd6c8');card(80,1460,W-160,230,'#0d0f11');
+ }else if(layout==='quote'){
+   await rect(media,0,0,W,H,1.1,local*4);card(70,540,W-140,650,'rgba(248,244,236,.92)',24);line(150,650,W-150,650,3,'#222');
+ }else if(layout==='mono'){
+   await rect(media,0,0,W,H,1.1,local*5);card(0,0,300,H,'rgba(0,0,0,.82)');line(350,130,W-80,130,4,'#fff');line(350,H-160,W-80,H-160,2,'#aaa');
+ }else if(layout==='heritage'){
+   await rect(media,105,260,W-210,1050,1.04,local*4);card(0,0,W,260,'#2b2119');card(0,1310,W,550,'#2b2119');
+   ctx.save();ctx.strokeStyle='#b9a071';ctx.lineWidth=10;ctx.strokeRect(55,55,W-110,H-110);ctx.lineWidth=2;ctx.strokeRect(75,75,W-150,H-150);ctx.restore();
+ }else if(layout==='finale'){
+   await rect(media,0,0,W,H,1.18,local*12);card(0,H-500,W,500,'rgba(0,0,0,.84)');line(50,1330,W-50,1330,8,'#fff');
+ }else{
+   await rect(media,0,0,W,H,1.05,local*3);
  }
- return true;
-}
-async function ensureSelectedFontReady(){
- const family=String($('fontFamily')?.value||'Noto Sans').trim()||'Noto Sans';
- const weight=String($('fontWeight')?.value||'700');
- const size=Math.max(20,Number($('fontSize')?.value||34));
- const sample=String($('captionText')?.value||'Festival of Bharat · भारत की संस्कृति · ભારતની સંસ્કૃતિ · जय श्री महाकाल');
- if(typeof document==='undefined'||!document.fonts?.load)return family;
- try{
-   await Promise.all([
-     document.fonts.load(weight+' '+(size*2)+'px "'+family+'"',sample),
-     document.fonts.load('600 54px "'+family+'"',sample)
-   ]);
-   await document.fonts.ready;
- }catch(e){
-   throw new Error('Font load failed for "'+family+'": '+String(e.message||e));
- }
- if(!document.fonts.check(weight+' '+(size*2)+'px "'+family+'"',sample)){
-   throw new Error('Font "'+family+'" is not ready for canvas rendering');
- }
- return family;
 }
 function overlay(ctx,idx,label){
- const design=String(activeTemplate?.design||'Minimal Type'),ff=$('fontFamily')?.value||'Noto Sans',fw=$('fontWeight')?.value||'700';
+ const layout=String(activeTemplate?.layout||'minimal'),ff=$('fontFamily')?.value||'Noto Sans',fw=$('fontWeight')?.value||'700';
  const total=sequence.length||selected.length,txt=$('captionText')?.value?.trim(),size=Math.max(20,Number($('fontSize')?.value||34)),title=(label||'Festival of Bharat').toUpperCase();
  ctx.save();ctx.textBaseline='middle';
  const text=(v,x,y,font,fill='#fff',align='left')=>{ctx.font=font;ctx.fillStyle=fill;ctx.textAlign=align;ctx.fillText(v,x,y)};
- if(design==='Editorial Split'){text('FESTIVAL OF BHARAT',55,90,'700 24px "'+ff+'",sans-serif','#aaa');text(title,55,360,'900 64px "'+ff+'",sans-serif');text(String(idx+1).padStart(2,'0')+' / '+String(total).padStart(2,'0'),55,1840,'600 24px "'+ff+'",sans-serif','#aaa')}
- else if(design==='Magazine Cover'){text('BHARAT',54,80,'900 44px "'+ff+'",sans-serif','#111');text(title,55,1400,'900 66px "'+ff+'",sans-serif','#111');text('CULTURE · HERITAGE · INDIA',55,1480,'600 22px "'+ff+'",sans-serif','#555')}
- else if(design==='News Flash'){text('CULTURE NOW',48,100,'900 30px "'+ff+'",sans-serif');text(title,48,1500,'900 68px "'+ff+'",sans-serif')}
- else if(design==='Vertical Label'){ctx.save();ctx.translate(42,980);ctx.rotate(-Math.PI/2);text('FESTIVAL OF BHARAT',0,0,'800 24px "'+ff+'",sans-serif');ctx.restore();text(title,930,1790,'800 38px "'+ff+'",sans-serif','#fff','right')}
- else if(design==='Polaroid Stack'){text(title,540,1515,'800 44px "'+ff+'",sans-serif','#171717','center');text('FESTIVAL OF BHARAT · '+String(idx+1).padStart(2,'0'),540,1580,'600 20px "'+ff+'",sans-serif','#555','center')}
- else if(['Film Strip','Vintage Frame','Sacred Frame','Classic Cinema'].includes(design)){text(title,75,1770,'800 48px "'+ff+'",sans-serif');text(String(idx+1)+' / '+total,75,1830,'600 22px "'+ff+'",sans-serif','rgba(255,255,255,.72)')}
- else if(['Collage Grid','Modern Blocks','Split Screen','Festival Cards','Type + Image'].includes(design)){text('THE DETAIL',55,105,'800 25px "'+ff+'",sans-serif');text(title,55,1830,'800 48px "'+ff+'",sans-serif')}
- else if(['Soft Journal','Retro Analog','Photo Dump','Doodle Notes','Memory Album'].includes(design)){text('FESTIVAL OF BHARAT',78,105,'800 34px "'+ff+'",sans-serif','#171717');text(title,78,1570,'800 48px "'+ff+'",sans-serif','#171717')}
- else if(['Bold Statement','Kinetic Caption','Neon Edge','Gradient Poster','Dynamic Crop'].includes(design)){text(title,50,115,'900 64px "'+ff+'",sans-serif');text(String(idx+1).padStart(2,'0'),1010,115,'900 38px "'+ff+'",sans-serif','rgba(255,255,255,.72)','right')}
+ const small=(v,x,y,fill='rgba(255,255,255,.72)',align='left')=>text(v,x,y,'600 20px "'+ff+'",sans-serif',fill,align);
+ if(layout==='editorial'){text('FESTIVAL OF BHARAT',55,90,'700 22px "'+ff+'",sans-serif','#555');text(title,55,380,'800 62px "'+ff+'",sans-serif','#111');small('EDITORIAL / '+String(idx+1).padStart(2,'0'),55,1710,'#555')}
+ else if(layout==='column'){text(title,820,420,'800 68px "'+ff+'",sans-serif');small('THE STORY · '+String(idx+1).padStart(2,'0'),820,500);text('BHARAT',820,1570,'800 34px "'+ff+'",sans-serif')}
+ else if(layout==='magazine'){text('BHARAT',55,105,'900 62px "'+ff+'",sans-serif','#111');text(title,55,1370,'900 64px "'+ff+'",sans-serif','#111');small('CULTURE · HERITAGE · INDIA',55,1450,'#555')}
+ else if(layout==='polaroid'){text(title,W/2,1510,'800 42px "'+ff+'",sans-serif','#171717','center');small('FESTIVAL OF BHARAT · '+String(idx+1).padStart(2,'0'),W/2,1570,'#555','center')}
+ else if(layout==='filmstrip'){text(title,70,1540,'800 44px "'+ff+'",sans-serif');small('FRAME '+String(idx+1).padStart(2,'0')+' / '+total,70,1610)}
+ else if(layout==='diary'){text('FIELD NOTES',80,80,'800 22px "'+ff+'",sans-serif','#4d463e');text(title,80,1390,'800 48px "'+ff+'",sans-serif','#171717');small('FESTIVAL OF BHARAT · MEMORY '+String(idx+1).padStart(2,'0'),'80',1470,'#665f56')}
+ else if(layout==='collage'||layout==='grid'||layout==='triptych'){small('THE DETAIL / '+String(idx+1).padStart(2,'0'),55,70);text(title,55,1785,'800 46px "'+ff+'",sans-serif')}
+ else if(layout==='diagonal'){text(title,50,70,'900 48px "'+ff+'",sans-serif');small('MOVE · LOOK · FEEL',50,1820)}
+ else if(layout==='bold'||layout==='kinetic'||layout==='pulse'){text(title,50,125,'900 66px "'+ff+'",sans-serif');small(String(idx+1).padStart(2,'0')+' / '+total,1030,125,'rgba(255,255,255,.75)','right')}
+ else if(layout==='neon'){small('LIVE FROM BHARAT',80,110);text(title,80,1570,'800 50px "'+ff+'",sans-serif')}
+ else if(layout==='news'){text('CULTURE NOW',45,90,'900 32px "'+ff+'",sans-serif');text(title,45,1510,'900 68px "'+ff+'",sans-serif','#171717');small('FIELD REPORT · '+String(idx+1).padStart(2,'0'),'45',1590,'#555')}
+ else if(layout==='wall'){text(title,75,1700,'800 46px "'+ff+'",sans-serif','#171717');small('SELECTED MOMENTS · '+total,75,1760,'#555')}
+ else if(layout==='sacred'||layout==='temple'||layout==='devotional'){text('ॐ',W/2,110,'700 46px "'+ff+'",sans-serif','rgba(255,255,255,.8)','center');text(title,W/2,1510,'800 48px "'+ff+'",sans-serif','#fff','center');small('FESTIVAL OF BHARAT · '+String(idx+1).padStart(2,'0'),W/2,1580,'rgba(255,255,255,.65)','center')}
+ else if(layout==='documentary'){small('ARCHIVE / DOCUMENTARY · '+String(idx+1).padStart(2,'0'),70,95,'#333');text(title,70,1510,'800 50px "'+ff+'",sans-serif');small('SOURCE · BHARAT CULTURE FIELD NOTES',70,1580)}
+ else if(layout==='history'){text(String(1947+idx),880,260,'900 54px "'+ff+'",sans-serif','#282521');text(title,880,520,'800 52px "'+ff+'",sans-serif','#282521');small('TIMELINE / '+String(idx+1).padStart(2,'0'),880,590,'#555')}
+ else if(layout==='culture'){small('CULTURE JOURNAL · BHARAT',80,120,'#555');text(title,80,1320,'800 50px "'+ff+'",sans-serif');small('DETAIL · CONTEXT · MEANING',80,1390,'rgba(255,255,255,.65)')}
+ else if(layout==='minimal'){small('FESTIVAL OF BHARAT',80,100);text(title,80,1500,'700 48px "'+ff+'",sans-serif')}
+ else if(layout==='quote'){text('“',110,640,'900 100px Georgia','#171717');text(title,W/2,820,'700 54px "'+ff+'",sans-serif','#171717','center');small('A MOMENT FROM BHARAT',W/2,990,'#555','center')}
+ else if(layout==='mono'){text(title,70,500,'800 50px "'+ff+'",sans-serif');small('DOCUMENT / '+String(idx+1).padStart(2,'0'),70,570,'rgba(255,255,255,.65)')}
+ else if(layout==='heritage'){small('BHARAT ARCHIVE · '+String(idx+1).padStart(2,'0'),90,130,'#d8c49a');text(title,90,1430,'800 48px "'+ff+'",sans-serif','#f1e7d3')}
+ else if(layout==='finale'){text('BHARAT',50,1390,'900 80px "'+ff+'",sans-serif');text(title,50,1490,'900 62px "'+ff+'",sans-serif');small('END / '+String(idx+1).padStart(2,'0')+' · FESTIVAL OF BHARAT',50,1580)}
  else{text('FESTIVAL OF BHARAT',50,90,'700 24px "'+ff+'",sans-serif','rgba(255,255,255,.78)');text(title,50,1770,'800 54px "'+ff+'",sans-serif')}
- if(txt){const pos=$('captionPos').value,y=pos==='top'?300:pos==='middle'?1020:1690;ctx.textAlign='center';ctx.fillStyle=(design==='Magazine Cover'||['Soft Journal','Retro Analog','Photo Dump','Doodle Notes','Memory Album'].includes(design))?'rgba(245,240,230,.9)':'rgba(0,0,0,.58)';ctx.fillRect(50,y-70,980,140);ctx.fillStyle=(design==='Magazine Cover'||['Soft Journal','Retro Analog','Photo Dump','Doodle Notes','Memory Album'].includes(design))?'#171717':'#fff';ctx.font=fw+' '+(size*2)+'px "'+ff+'",sans-serif';ctx.fillText(txt,540,y)}
+ if(txt){const pos=$('captionPos').value,y=pos==='top'?280:pos==='middle'?980:1680;ctx.fillStyle='rgba(0,0,0,.72)';ctx.fillRect(45,y-70,990,140);ctx.fillStyle='#fff';ctx.font=fw+' '+(size*2)+'px "'+ff+'",sans-serif';ctx.textAlign='center';ctx.fillText(txt,W/2,y)}
  ctx.restore();
 }
 function start(){if(playing)return;playing=true;started=performance.now();const f=async n=>{if(!playing)return;const ok=await draw((n-started)/1000);if(!ok){playing=false;cancelAnimationFrame(raf);return}if(playing)raf=requestAnimationFrame(f)};raf=requestAnimationFrame(f)}
