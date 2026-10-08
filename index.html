@@ -459,7 +459,7 @@ async function draw(t,captureFrame=false){
    }
 async function renderTemplateMedia(ctx,media,scene,local,idx,slot,captureFrame){
  const design=String(activeTemplate?.design||'Minimal Type');
- const box=(x,y,w,h,zoom=1,ox=0,oy=0,rotation=0)=>{ctx.save();ctx.beginPath();ctx.rect(x,y,w,h);ctx.clip();fit(ctx,media,w,h,zoom,ox,oy,rotation);ctx.restore()};
+ const box=(x,y,w,h,zoom=1,ox=0,oy=0,rotation=0)=>{ctx.save();ctx.beginPath();ctx.rect(x,y,w,h);ctx.clip();ctx.translate(x,y);fit(ctx,media,w,h,zoom,ox,oy,rotation);ctx.restore()};
  const panel=(x,y,w,h,fill)=>{ctx.fillStyle=fill;ctx.fillRect(x,y,w,h)};
  const editorial=['Editorial Split','Magazine Cover','News Flash','Vertical Label','Travel Diary'].includes(design);
  const frame=['Polaroid Stack','Film Strip','Vintage Frame','Sacred Frame','Classic Cinema'].includes(design);
@@ -474,7 +474,7 @@ async function renderTemplateMedia(ctx,media,scene,local,idx,slot,captureFrame){
    else {box(0,260,1080,1320,1.08,px,py,rot);panel(0,0,1080,310,'rgba(8,10,12,.92)');panel(0,1580,1080,340,'rgba(8,10,12,.88)')}
  }else if(frame){
    if(design==='Polaroid Stack'){
-     panel(0,0,1080,1920,'#151515');ctx.save();ctx.translate(540,950);ctx.rotate(-.025);ctx.fillStyle='#f4f0e8';ctx.fillRect(-425,-610,850,1220);ctx.save();ctx.beginPath();ctx.rect(-395,-575,790,930);ctx.clip();fit(ctx,media,790,930,1.05,px,py,0);ctx.restore();ctx.restore()
+     panel(0,0,1080,1920,'#151515');ctx.save();ctx.translate(540,950);ctx.rotate(-.025);ctx.fillStyle='#f4f0e8';ctx.fillRect(-425,-610,850,1220);ctx.save();ctx.beginPath();ctx.rect(-395,-575,790,930);ctx.clip();ctx.translate(-395,-465);fit(ctx,media,790,930,1.05,px,py,0);ctx.restore();ctx.restore()
    }else if(design==='Film Strip'){
      panel(0,0,1080,1920,'#090909');box(95,210,890,1500,1.03,px,py,rot);ctx.fillStyle='#050505';ctx.fillRect(0,0,1080,170);ctx.fillRect(0,1750,1080,170);for(let y=32;y<1880;y+=95){ctx.fillStyle='#ddd';ctx.fillRect(18,y,48,58);ctx.fillRect(1014,y,48,58)}
    }else{
