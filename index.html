@@ -345,31 +345,138 @@ $('clear').onclick=()=>{selected.length=0;render();draw(0)};
 $('importBtn').onclick=()=>$('files').click();
 $('files').onchange=e=>{[...e.target.files].forEach(f=>{const u=URL.createObjectURL(f);results.unshift({id:crypto.randomUUID(),title:f.name,source:'Local',url:u,playUrl:u,thumbPlay:u,kind:f.type.startsWith('video')?'video':'image'})});sequence=buildSequence();render();renderToken++;draw(0)};
 async function json(u){try{const r=await fetch(u);return r.ok?await r.json():null}catch{return null}}
+async function directWikimediaSearch(term){
+  const clean=v=>String(v?.value||'').replace(/<[^>]+>/g,'').trim();
+  const reject=t=>/(icon|logo|pictogram|coat of arms|locator map|flag of|diagram|watermark|symbol|\\.svg\\b|banner\\b)/i.test(String(t||''));
+  const timeoutFetch=async(url,ms=12000)=>{
+    const ctl=new AbortController(),timer=setTimeout(()=>ctl.abort(),ms);
+    try{
+      const r=await fetch(url,{cache:'no-store',headers:{Accept:'application/json'},signal:ctl.signal});
+      const text=await r.text();
+      if(!r.ok)throw new Error('HTTP '+r.status);
+      return JSON.parse(text);
+    }finally{clearTimeout(timer)}
+  };
+  try{
+    const searchUrl=new URL('https://commons.wikimedia.org/w/api.php');
+    for(const [k,v] of Object.entries({
+      action:'query',format:'json',formatversion:'2',origin:'*',
+      list:'search',srsearch:term,srnamespace:'6',srlimit:'60',srwhat:'text'
+    })) searchUrl.searchParams.set(k,v);
+    const sd=await timeoutFetch(searchUrl.toString());
+    const titles=(sd?.query?.search||[]).map(x=>x.title).filter(Boolean);
+    if(!titles.length)return {items:[],error:'Wikimedia returned no file pages'};
+    const metaUrl=new URL('https://commons.wikimedia.org/w/api.php');
+    for(const [k,v] of Object.entries({
+      action:'query',format:'json',formatversion:'2',origin:'*',
+      titles:titles.join('|'),prop:'imageinfo',
+      iiprop:'url|size|mime|mediatype|extmetadata',iiextmetadatafilter:'LicenseShortName|Artist|LicenseUrl',
+      iiurlwidth:'1400'
+    })) metaUrl.searchParams.set(k,v);
+    const md=await timeoutFetch(metaUrl.toString());
+    const items=[];
+    for(const x of md?.query?.pages||[]){
+      const z=x?.imageinfo?.[0],mime=String(z?.mime||'').toLowerCase();
+      const kind=mime.startsWith('video/')?'video':mime.startsWith('image/')?'image':'';
+      const title=String(x.title||'Untitled').replace(/^File:/,'');
+      if(!x.pageid||!z?.url||!kind||mime.includes('svg')||z.mediatype==='AUDIO'||z.mediatype==='TEXT'||reject(title))continue;
+      if(kind==='image'&&z.width&&z.width<640)continue;
+      if(kind==='video'&&z.size&&z.size>90000000)continue;
+      items.push({
+        id:'browser-wm-'+x.pageid,title,source:'Wikimedia Commons',kind,
+        url:z.url,originalUrl:z.url,thumb:z.thumburl||z.url,
+        playUrl:z.url,thumbPlay:z.thumburl||z.url,
+        width:Number(z.width||0),height:Number(z.height||0),mime,
+        license:clean(z.extmetadata?.LicenseShortName),
+        licenseUrl:clean(z.extmetadata?.LicenseUrl),
+        author:clean(z.extmetadata?.Artist),
+        pageUrl:z.descriptionurl||'https://commons.wikimedia.org/wiki/Special:Redirect/file/'+encodeURIComponent(title)
+      });
+    }
+    return {items};
+  }catch(e){
+    return {items:[],error:'Direct Wikimedia search: '+String(e?.message||e)};
+  }
+}
+async function directOpenverseSearch(term){
+  try{
+    const u=new URL('https://api.openverse.org/v1/images/');
+    u.searchParams.set('q',term);u.searchParams.set('page_size','40');
+    const ctl=new AbortController(),timer=setTimeout(()=>ctl.abort(),10000);
+    try{
+      const r=await fetch(u,{cache:'no-store',headers:{Accept:'application/json'},signal:ctl.signal});
+      const d=await r.json();
+      if(!r.ok)throw new Error('HTTP '+r.status);
+      return {items:(d?.results||[]).filter(x=>x?.url&&(!x.width||x.width>=640)).map(x=>({
+        id:'browser-ov-'+x.id,title:x.title||'Untitled',source:'Openverse',kind:'image',
+        url:x.url,originalUrl:x.url,thumb:x.thumbnail||x.url,playUrl:x.url,thumbPlay:x.thumbnail||x.url,
+        width:Number(x.width||0),height:Number(x.height||0),mime:'image/*',
+        license:x.license||'',licenseUrl:x.license_url||'',author:x.creator||'',pageUrl:x.foreign_landing_url||''
+      }))};
+    }finally{clearTimeout(timer)}
+  }catch(e){return {items:[],error:'Direct Openverse search: '+String(e?.message||e)}}
+}
 async function search(q){
   q=String(q||'').trim();
   if(!q)return;
   $('statusTop').textContent='RESEARCHING';
   $('sourceStatus').textContent='Searching real photos + videos…';
   results.length=0; selected.length=0; render();
+  const addUnique=(out,x)=>{
+    if(!x?.url)return;
+    const key=String(x.kind)+'|'+String(x.url).split('?')[0];
+    if(out.some(a=>a._key===key))return;
+    x._key=key;
+    out.push(x);
+  };
   try{
-    const r=await fetch('/media-search?q='+encodeURIComponent(q),{cache:'no-store'});
-    const d=await r.json().catch(()=>null);
-    if(!r.ok) throw new Error(d?.error||'Media search failed');
-    const out=[],seen=new Set();
-    const add=x=>{if(x?.url&&!seen.has(x.url)){seen.add(x.url);x.playUrl=proxy(x.url);x.thumbPlay=x.thumb?proxy(x.thumb):x.playUrl;out.push(x)}};
-    (d?.results||[]).forEach(add);
-    // The server now returns photos and videos together, so no second
-    // browser-side Wikimedia request is needed here.
+    // Use the server path and browser path together. The server is preferred,
+    // but research must still work if Render cannot reach Wikimedia.
+    const controller=new AbortController(),timer=setTimeout(()=>controller.abort(),12000);
+    let serverData=null,serverError='';
+    try{
+      const r=await fetch('/media-search?q='+encodeURIComponent(q),{cache:'no-store',signal:controller.signal});
+      const d=await r.json().catch(()=>null);
+      if(!r.ok)throw new Error(d?.error||'Media search failed');
+      serverData=d||{};
+    }catch(e){serverError=String(e?.message||e)}
+    finally{clearTimeout(timer)}
+
+    const serverOut=[];
+    for(const x of (serverData?.results||[]))addUnique(serverOut,x);
+
+    // If server search returned nothing, query the same ZIP-approved Wikimedia
+    // source directly from the browser instead of showing a false empty gallery.
+    let direct={items:[]},openverse={items:[]};
+    if(serverOut.length<8){
+      direct=await directWikimediaSearch(q);
+      if(direct.items.length<8){
+        const expanded=/india|festival|temple/i.test(q)?q:q+' festival India';
+        const d2=expanded.toLowerCase()===q.toLowerCase()?{items:[]}:await directWikimediaSearch(expanded);
+        direct.items=[...direct.items,...(d2.items||[])];
+        if(d2.error&&!direct.error)direct.error=d2.error;
+      }
+    }
+    const out=[];
+    serverOut.forEach(x=>addUnique(out,x));
+    (direct.items||[]).forEach(x=>addUnique(out,x));
+    if(out.filter(x=>x.kind==='image').length<8){
+      openverse=await directOpenverseSearch(q);
+      (openverse.items||[]).forEach(x=>addUnique(out,x));
+    }
+
     results.push(...out.filter(x=>x.kind==='image').slice(0,120),...out.filter(x=>x.kind==='video').slice(0,40));
     const pc=results.filter(x=>x.kind==='image').length, vc=results.filter(x=>x.kind==='video').length;
     if(!results.length){
-      const detail=(d?.errors||[]).filter(Boolean).join(' · ')||d?.error||d?.message||'No suitable photos or videos found.';
+      const detail=serverError||serverData?.error||(direct.error||'')||'No suitable photos or videos found.';
       $('sourceStatus').textContent='Research returned 0 usable media — '+detail;
       $('statusTop').textContent='NO RESULTS';
     }else{
-      $('sourceStatus').textContent='Loaded '+pc+' photos + '+vc+' videos · '+(d?.source||'Wikimedia Commons');
+      const sources=[...new Set(results.map(x=>x.source).filter(Boolean))].join(' + ');
+      $('sourceStatus').textContent='Loaded '+pc+' photos + '+vc+' videos · '+sources;
       $('statusTop').textContent='READY';
     }
+    // Keep direct Wikimedia URLs for the gallery; proxy them only when playback/rendering needs it.
     sequence=[]; render(); renderToken++; draw(0);
   }catch(e){
     $('statusTop').textContent='ERROR';
