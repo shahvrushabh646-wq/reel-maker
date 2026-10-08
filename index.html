@@ -142,7 +142,7 @@
 <button onclick="openWorkspace('music')"><b>♫</b>Music</button>
 <button onclick="openWorkspace('preview')"><b>▶</b>Preview</button>
 </nav></div>
-<script src="/recent-templates.js"></script><script>
+<script src="/recent-templates.js"></script><script src="/recent-look.js"></script><script>
 const $=id=>document.getElementById(id),selected=[],results=[];let playing=false,raf=0,started=0,activeVideo=null,audioObj=null,audioURL=null,audioCtx=null,audioSource=null,audioDest=null;
 const proxy=u=>{if(!u)return '';if(/^\/proxy\?url=/.test(u))return u;return '/proxy?url='+encodeURIComponent(u)},esc=s=>String(s||'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
 const layoutAlias={dawn:'cinematic',split:'editorial',energy:'pulse',burst:'pulse',crowd:'pulse',mbold:'bold',doc:'documentary',timeline:'history',journal:'diary',hframe:'heritage',dcrop:'diagonal',sacredoc:'sacred',cards:'magazine',cover:'magazine',feature:'magazine',eframe:'filmstrip',estory:'diary',scrapbook:'diary',dgrid:'grid',mframe:'collage'};
@@ -510,6 +510,7 @@ async function draw(t,captureFrame=false){
      }catch{}
    }
    await renderTemplateMedia(ctx,media,scene,local,idx,slot,captureFrame);
+   applyRecentZipLook(ctx,activeTemplate);
    applyTransition(ctx,activeTemplate.transition,local,idx,sequence.length);
    overlay(ctx,idx,scene.label);
    $('bar').style.width=Math.round(local*100)+'%';
@@ -638,35 +639,18 @@ function applyTransition(ctx,id,local,idx,total){
  }
 }
 function overlay(ctx,idx,label){
- const layout=String(activeTemplate?.renderLayout||activeTemplate?.layout||'minimal'),ff=$('fontFamily')?.value||'Noto Sans',fw=$('fontWeight')?.value||'700';
- const total=sequence.length||selected.length,txt=$('captionText')?.value?.trim(),size=Math.max(20,Number($('fontSize')?.value||34)),title=(label||'Festival of Bharat').toUpperCase();
- ctx.save();ctx.textBaseline='middle';
- const text=(v,x,y,font,fill='#fff',align='left')=>{ctx.font=font;ctx.fillStyle=fill;ctx.textAlign=align;ctx.fillText(v,x,y)};
- const small=(v,x,y,fill='rgba(255,255,255,.72)',align='left')=>text(v,x,y,'600 20px "'+ff+'",sans-serif',fill,align);
- if(layout==='editorial'){text('FESTIVAL OF BHARAT',55,90,'700 22px "'+ff+'",sans-serif','#555');text(title,55,380,'800 62px "'+ff+'",sans-serif','#111');small('EDITORIAL / '+String(idx+1).padStart(2,'0'),55,1710,'#555')}
- else if(layout==='column'){text(title,820,420,'800 68px "'+ff+'",sans-serif');small('THE STORY · '+String(idx+1).padStart(2,'0'),820,500);text('BHARAT',820,1570,'800 34px "'+ff+'",sans-serif')}
- else if(layout==='magazine'){text('BHARAT',55,105,'900 62px "'+ff+'",sans-serif','#111');text(title,55,1370,'900 64px "'+ff+'",sans-serif','#111');small('CULTURE · HERITAGE · INDIA',55,1450,'#555')}
- else if(layout==='polaroid'){text(title,W/2,1510,'800 42px "'+ff+'",sans-serif','#171717','center');small('FESTIVAL OF BHARAT · '+String(idx+1).padStart(2,'0'),W/2,1570,'#555','center')}
- else if(layout==='filmstrip'){text(title,70,1540,'800 44px "'+ff+'",sans-serif');small('FRAME '+String(idx+1).padStart(2,'0')+' / '+total,70,1610)}
- else if(layout==='diary'){text('FIELD NOTES',80,80,'800 22px "'+ff+'",sans-serif','#4d463e');text(title,80,1390,'800 48px "'+ff+'",sans-serif','#171717');small('FESTIVAL OF BHARAT · MEMORY '+String(idx+1).padStart(2,'0'),'80',1470,'#665f56')}
- else if(layout==='collage'||layout==='grid'||layout==='triptych'){small('THE DETAIL / '+String(idx+1).padStart(2,'0'),55,70);text(title,55,1785,'800 46px "'+ff+'",sans-serif')}
- else if(layout==='diagonal'){text(title,50,70,'900 48px "'+ff+'",sans-serif');small('MOVE · LOOK · FEEL',50,1820)}
- else if(layout==='bold'||layout==='kinetic'||layout==='pulse'){text(title,50,125,'900 66px "'+ff+'",sans-serif');small(String(idx+1).padStart(2,'0')+' / '+total,1030,125,'rgba(255,255,255,.75)','right')}
- else if(layout==='neon'){small('LIVE FROM BHARAT',80,110);text(title,80,1570,'800 50px "'+ff+'",sans-serif')}
- else if(layout==='news'){text('CULTURE NOW',45,90,'900 32px "'+ff+'",sans-serif');text(title,45,1510,'900 68px "'+ff+'",sans-serif','#171717');small('FIELD REPORT · '+String(idx+1).padStart(2,'0'),'45',1590,'#555')}
- else if(layout==='wall'){text(title,75,1700,'800 46px "'+ff+'",sans-serif','#171717');small('SELECTED MOMENTS · '+total,75,1760,'#555')}
- else if(layout==='sacred'||layout==='temple'||layout==='devotional'){text('ॐ',W/2,110,'700 46px "'+ff+'",sans-serif','rgba(255,255,255,.8)','center');text(title,W/2,1510,'800 48px "'+ff+'",sans-serif','#fff','center');small('FESTIVAL OF BHARAT · '+String(idx+1).padStart(2,'0'),W/2,1580,'rgba(255,255,255,.65)','center')}
- else if(layout==='documentary'){small('ARCHIVE / DOCUMENTARY · '+String(idx+1).padStart(2,'0'),70,95,'#333');text(title,70,1510,'800 50px "'+ff+'",sans-serif');small('SOURCE · BHARAT CULTURE FIELD NOTES',70,1580)}
- else if(layout==='history'){text(String(1947+idx),880,260,'900 54px "'+ff+'",sans-serif','#282521');text(title,880,520,'800 52px "'+ff+'",sans-serif','#282521');small('TIMELINE / '+String(idx+1).padStart(2,'0'),880,590,'#555')}
- else if(layout==='culture'){small('CULTURE JOURNAL · BHARAT',80,120,'#555');text(title,80,1320,'800 50px "'+ff+'",sans-serif');small('DETAIL · CONTEXT · MEANING',80,1390,'rgba(255,255,255,.65)')}
- else if(layout==='minimal'){small('FESTIVAL OF BHARAT',80,100);text(title,80,1500,'700 48px "'+ff+'",sans-serif')}
- else if(layout==='quote'){text('“',110,640,'900 100px Georgia','#171717');text(title,W/2,820,'700 54px "'+ff+'",sans-serif','#171717','center');small('A MOMENT FROM BHARAT',W/2,990,'#555','center')}
- else if(layout==='mono'){text(title,70,500,'800 50px "'+ff+'",sans-serif');small('DOCUMENT / '+String(idx+1).padStart(2,'0'),70,570,'rgba(255,255,255,.65)')}
- else if(layout==='heritage'){small('BHARAT ARCHIVE · '+String(idx+1).padStart(2,'0'),90,130,'#d8c49a');text(title,90,1430,'800 48px "'+ff+'",sans-serif','#f1e7d3')}
- else if(layout==='finale'){text('BHARAT',50,1390,'900 80px "'+ff+'",sans-serif');text(title,50,1490,'900 62px "'+ff+'",sans-serif');small('END / '+String(idx+1).padStart(2,'0')+' · FESTIVAL OF BHARAT',50,1580)}
- else{text('FESTIVAL OF BHARAT',50,90,'700 24px "'+ff+'",sans-serif','rgba(255,255,255,.78)');text(title,50,1770,'800 54px "'+ff+'",sans-serif')}
- if(txt){const pos=$('captionPos').value,y=pos==='top'?280:pos==='middle'?980:1680;ctx.fillStyle='rgba(0,0,0,.72)';ctx.fillRect(45,y-70,990,140);ctx.fillStyle='#fff';ctx.font=fw+' '+(size*2)+'px "'+ff+'",sans-serif';ctx.textAlign='center';ctx.fillText(txt,W/2,y)}
- ctx.restore();
+  // Clean-output mode from the supplied reel-templates-no-text ZIP.
+  // Template hook/title text is metadata only; user-entered caption remains optional.
+  const ff=$('fontFamily')?.value||'Noto Sans',fw=$('fontWeight')?.value||'700';
+  const size=Math.max(20,Number($('fontSize')?.value||34)),txt=$('captionText')?.value?.trim();
+  if(!txt)return;
+  const W=ctx.canvas.width,H=ctx.canvas.height;
+  ctx.save();
+  const pos=$('captionPos')?.value||'bottom',y=pos==='top'?280:pos==='middle'?980:1680;
+  ctx.fillStyle='rgba(0,0,0,.72)';ctx.fillRect(45,y-70,990,140);
+  ctx.fillStyle='#fff';ctx.font=fw+' '+(size*2)+'px "'+ff+'",sans-serif';
+  ctx.textAlign='center';ctx.textBaseline='middle';ctx.fillText(txt,W/2,y);
+  ctx.restore();
 }
 function start(){if(playing)return;playing=true;started=performance.now();const f=async n=>{if(!playing)return;const ok=await draw((n-started)/1000);if(!ok){playing=false;cancelAnimationFrame(raf);return}if(playing)raf=requestAnimationFrame(f)};raf=requestAnimationFrame(f)}
 $('build').onclick=async()=>{
