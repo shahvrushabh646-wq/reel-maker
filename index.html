@@ -422,61 +422,17 @@ async function search(q){
   $('statusTop').textContent='RESEARCHING';
   $('sourceStatus').textContent='Searching real photos + videos…';
   results.length=0; selected.length=0; render();
-  const addUnique=(out,x)=>{
-    if(!x?.url)return;
-    const key=String(x.kind)+'|'+String(x.url).split('?')[0];
-    if(out.some(a=>a._key===key))return;
-    x._key=key;
-    out.push(x);
-  };
   try{
-    // Use the server path and browser path together. The server is preferred,
-    // but research must still work if Render cannot reach Wikimedia.
-    const controller=new AbortController(),timer=setTimeout(()=>controller.abort(),12000);
-    let serverData=null,serverError='';
-    try{
-      const r=await fetch('/media-search?q='+encodeURIComponent(q),{cache:'no-store',signal:controller.signal});
-      const d=await r.json().catch(()=>null);
-      if(!r.ok)throw new Error(d?.error||'Media search failed');
-      serverData=d||{};
-    }catch(e){serverError=String(e?.message||e)}
-    finally{clearTimeout(timer)}
-
-    const serverOut=[];
-    for(const x of (serverData?.results||[]))addUnique(serverOut,x);
-
-    // If server search returned nothing, query the same ZIP-approved Wikimedia
-    // source directly from the browser instead of showing a false empty gallery.
-    let direct={items:[]},openverse={items:[]};
-    if(serverOut.length<8){
-      direct=await directWikimediaSearch(q);
-      if(direct.items.length<8){
-        const expanded=/india|festival|temple/i.test(q)?q:q+' festival India';
-        const d2=expanded.toLowerCase()===q.toLowerCase()?{items:[]}:await directWikimediaSearch(expanded);
-        direct.items=[...direct.items,...(d2.items||[])];
-        if(d2.error&&!direct.error)direct.error=d2.error;
-      }
-    }
-    const out=[];
-    serverOut.forEach(x=>addUnique(out,x));
-    (direct.items||[]).forEach(x=>addUnique(out,x));
-    if(out.filter(x=>x.kind==='image').length<8){
-      openverse=await directOpenverseSearch(q);
-      (openverse.items||[]).forEach(x=>addUnique(out,x));
-    }
-
+    const r=await fetch('/media-search?q='+encodeURIComponent(q),{cache:'no-store'});
+    const d=await r.json().catch(()=>null);
+    if(!r.ok) throw new Error(d?.error||'Media search failed');
+    const out=[],seen=new Set();
+    const add=x=>{if(x?.url&&!seen.has(x.url)){seen.add(x.url);x.playUrl=proxy(x.url);x.thumbPlay=x.thumb?proxy(x.thumb):x.playUrl;out.push(x)}};
+    (d?.results||[]).forEach(add);
     results.push(...out.filter(x=>x.kind==='image').slice(0,120),...out.filter(x=>x.kind==='video').slice(0,40));
     const pc=results.filter(x=>x.kind==='image').length, vc=results.filter(x=>x.kind==='video').length;
-    if(!results.length){
-      const detail=serverError||serverData?.error||(direct.error||'')||'No suitable photos or videos found.';
-      $('sourceStatus').textContent='Research returned 0 usable media — '+detail;
-      $('statusTop').textContent='NO RESULTS';
-    }else{
-      const sources=[...new Set(results.map(x=>x.source).filter(Boolean))].join(' + ');
-      $('sourceStatus').textContent='Loaded '+pc+' photos + '+vc+' videos · '+sources;
-      $('statusTop').textContent='READY';
-    }
-    // Keep direct Wikimedia URLs for the gallery; proxy them only when playback/rendering needs it.
+    $('sourceStatus').textContent='Loaded '+pc+' photos + '+vc+' videos';
+    $('statusTop').textContent='READY';
     sequence=[]; render(); renderToken++; draw(0);
   }catch(e){
     $('statusTop').textContent='ERROR';
