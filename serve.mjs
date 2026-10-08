@@ -230,6 +230,15 @@ const server=createServer(async(req,res)=>{
       }catch(error){return {items:[],error:'Openverse photos: '+String(error?.message||error)}}
     };
 
+    const searchCommonsBroad=async term=>{
+      const api=new URL('https://commons.wikimedia.org/w/api.php');
+      for(const [k,v] of [['action','query'],['format','json'],['formatversion','2'],['origin','*'],['generator','search'],['gsrsearch',term],['gsrnamespace','6'],['gsrlimit','40'],['prop','imageinfo'],['iiprop','url|size|mime|mediatype'],['iiurlwidth','1400']])api.searchParams.set(k,v);
+      try{
+        const body=await fetchJson(api.toString(),12000);
+        return (body?.query?.pages||[]).map(mapPage).filter(Boolean);
+      }catch(error){return []}
+    };
+
     const variants=variantsFor(q),primary=variants[0]||q;
     const [photos,videos]=await Promise.all([searchCommons(primary,'image'),searchCommons(primary,'video')]);
     const errors=[photos.error,videos.error].filter(Boolean);
@@ -239,10 +248,17 @@ const server=createServer(async(req,res)=>{
       if(extra.error)errors.push(extra.error);
       images=images.concat(extra.items);
     }
-    if(offset===0&&images.length<4){
-      const extra=await searchOpenverse(primary);
-      if(extra.error)errors.push(extra.error);
-      images=images.concat(extra.items);
+    if(images.length<8 || videos.items.length<2){
+      const broad=await searchCommonsBroad(primary);
+      for(const item of broad){if(item.kind==='image')images.push(item);else if(item.kind==='video')videos.items.push(item)}
+    }
+    if(offset===0&&images.length<8){
+      for(const term of variants.slice(0,2)){
+        const extra=await searchOpenverse(term);
+        if(extra.error)errors.push(extra.error);
+        images=images.concat(extra.items);
+        if(images.length>=12)break;
+      }
     }
 
     const seen=new Set(),results=[];
