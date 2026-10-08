@@ -915,7 +915,25 @@ $('export').onclick=async()=>{
  }
  rec.start(200);
  $('qc').textContent='QC: Creating reel… 0%';
- const duration=Math.max(1,+$('duration').value||15),startedAt=performance.now();
+
+ // Export timing:
+ // - If the user selected only videos, preserve the COMPLETE duration of every
+ //   selected source video instead of clipping each one to a template scene slot.
+ // - Mixed/photo reels keep the chosen reel duration and existing template timing.
+ let duration=Math.max(1,+$('duration').value||15);
+ const exportVideos=selected.filter(x=>x?.kind==='video');
+ const exportImages=selected.filter(x=>x?.kind==='image');
+ if(exportVideos.length && !exportImages.length){
+   const sourceDurations=exportVideos.map(x=>{
+     const v=videoCache.get(x.id);
+     return v?.duration && Number.isFinite(v.duration) ? Number(v.duration) : 0;
+   }).filter(x=>x>0);
+   if(sourceDurations.length===exportVideos.length){
+     duration=Math.max(1,sourceDurations.reduce((sum,x)=>sum+x,0));
+   }
+ }
+ const exportEnd=duration;
+ const originalDurationValue=$('duration').value;
  playing=true;
  while(playing){
    const elapsed=(performance.now()-startedAt)/1000;
@@ -926,7 +944,7 @@ $('export').onclick=async()=>{
    await new Promise(requestAnimationFrame);
  }
  playing=false;cancelAnimationFrame(raf);
- await draw(duration-.001,true);
+ await draw(Math.max(0,exportEnd-.001),true);
  if(exportAudio){try{exportAudio.pause()}catch{}}
  rec.stop();
 };
