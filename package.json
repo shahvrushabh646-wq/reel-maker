@@ -8,5 +8,6 @@
   },
   "engines": {
     "node": "22.16.0"
-  }
+  },
+  "main": "server.mjs"
 }
