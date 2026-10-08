@@ -934,6 +934,17 @@ $('export').onclick=async()=>{
    }
  }
  const exportEnd=duration;
+ const previewSequence=sequence;
+ if(exportVideos.length && !exportImages.length){
+   // One export scene per selected source video: each source plays once from
+   // start to finish, with no template-slot clipping or repetition.
+   sequence=exportVideos.map((media,n)=>({
+     media,
+     role:'VIDEO',
+     label:media.title||('Video '+(n+1)),
+     n
+   }));
+ }
  exportTimelineDuration=duration;
  playing=true;
  while(playing){
@@ -948,6 +959,7 @@ $('export').onclick=async()=>{
  await draw(Math.max(0,exportEnd-.001),true);
  if(exportAudio){try{exportAudio.pause()}catch{}}
  rec.stop();
+ sequence=previewSequence;
  exportTimelineDuration=null;
 };
 update();draw(0);
