@@ -101,7 +101,7 @@
 .templateMock-mono .m1{inset:0}.templateMock-mono .m2{left:0;top:0;bottom:0;width:29%;background:rgba(0,0,0,.86)}
 .templateMock-heritage{background:#2b2119}.templateMock-heritage .m1{left:12%;right:12%;top:16%;bottom:16%;border:8px solid #b9a071}.templateMock-heritage .m2{left:18%;right:18%;top:23%;bottom:23%}
 .templateMock-finale .m1{inset:0}.templateMock-finale:after{content:'';position:absolute;left:5%;right:5%;bottom:15%;height:4px;background:#fff}.templateMock .mockTitle{text-shadow:0 2px 8px rgba(0,0,0,.55)}
-</style></style></head><body><div class="app">
+</style></head><body><div class="app">
 <aside class="side"><div class="brand">Festival of Bharat<small>REEL PRODUCTION STUDIO</small></div><div class="nav"><button class="active">Dashboard</button><button onclick="openWorkspace('templates')">Templates</button><button onclick="openWorkspace('music')">Music</button><button onclick="openWorkspace('fonts')">Fonts & Captions</button><button onclick="openWorkspace('media')">Media Library</button><button onclick="openWorkspace('preview')">Reel Preview</button></div><div class="footerNote">Local-first workflow<br>Real source media only<br>No fake music or fake render status</div></aside>
 <main class="main">
 <div class="top"><div class="title"><h1>Reel Production Dashboard</h1><div class="muted">Create a polished 9:16 Bharat story from media, template and music.</div></div><div class="row"><span class="muted" id="statusTop">READY</span><button class="primary" id="generate">Generate Reel</button></div></div>
@@ -849,7 +849,11 @@ $('export').onclick=async()=>{
    if(musicSrc){
      if(audioObj){try{audioObj.pause()}catch{}}
      audioObj=new Audio(musicSrc);audioObj.crossOrigin='anonymous';audioObj.preload='auto';
-     if(!audioCtx)audioCtx=new AudioContext();
+     // Create a fresh audio graph for every export. MediaElementSource nodes cannot be reused across exports.
+     try{if(audioCtx){await audioCtx.close()}}catch{}
+     audioCtx=new AudioContext();
+     audioSource=null;
+     audioDest=null;
      if(audioCtx.state==='suspended')await audioCtx.resume();
      audioSource=audioCtx.createMediaElementSource(audioObj);
      audioDest=audioCtx.createMediaStreamDestination();
