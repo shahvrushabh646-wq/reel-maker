@@ -29,7 +29,7 @@ const server=createServer(async(req,res)=>{
     try{
       const t=new URL(target);
       const host=t.hostname.toLowerCase().replace(/^\[|\]$/g,'');
-      const privateHost=host==='localhost'||host==='0.0.0.0'||host==='::1'||host.endsWith('.local')||/^127\./.test(host)||/^10\./.test(host)||/^192\.168\./.test(host)||/^169\.254\./.test(host)||/^172\.(1[6-9]|2\\d|3[0-1])\./.test(host);
+      const privateHost=host==='localhost'||host==='0.0.0.0'||host==='::1'||host.endsWith('.local')||/^127\./.test(host)||/^10\./.test(host)||/^192\.168\./.test(host)||/^169\.254\./.test(host)||/^172\.(1[6-9]|2\d|3[0-1])\./.test(host);
       if(!['http:','https:'].includes(t.protocol)||privateHost) return send(res,400,{'Content-Type':'text/plain'},'Unsupported url');
       const headers={
         'User-Agent':'FestivalOfBharatReelMaker/1.4 (cultural reel studio; https://commons.wikimedia.org/)',
