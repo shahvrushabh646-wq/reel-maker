@@ -2,7 +2,8 @@ import { createServer } from 'node:http';
 import { readFile } from 'node:fs/promises';
 import { resolve } from 'node:path';
 import { readFileSync, existsSync } from 'node:fs';
-import { writeFile, unlink } from 'node:fs/promises';
+import { unlink, stat, open } from 'node:fs/promises';
+import { createWriteStream, createReadStream } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { spawn } from 'node:child_process';
 
@@ -74,43 +75,68 @@ const server=createServer(async(req,res)=>{
     }
   }
   if(u.pathname==='/convert-mp4' && req.method==='POST'){
-    const chunks=[]; let size=0; const max=180*1024*1024;
+    // Stream uploads/output to disk so FFmpeg does not duplicate large videos in Node RAM.
+    const max=180*1024*1024;
     const declared=Number(req.headers['content-length']||0);
     if(declared>max) return send(res,413,{'Content-Type':'application/json'},JSON.stringify({error:'Video too large',limitBytes:max}));
-    for await (const chunk of req){
-      size+=chunk.length;
-      if(size>max) return send(res,413,{'Content-Type':'application/json'},JSON.stringify({error:'Video too large',limitBytes:max}));
-      chunks.push(chunk);
-    }
-    if(!size) return send(res,400,{'Content-Type':'application/json'},JSON.stringify({error:'Empty video upload'}));
-    const input=resolve(tmpdir(),'reel-'+Date.now()+'-'+Math.random().toString(36).slice(2)+'.webm');
-    const output=resolve(tmpdir(),'reel-'+Date.now()+'-'+Math.random().toString(36).slice(2)+'.mp4');
+    const stamp=Date.now()+'-'+Math.random().toString(36).slice(2);
+    const input=resolve(tmpdir(),'reel-'+stamp+'.webm');
+    const output=resolve(tmpdir(),'reel-'+stamp+'.mp4');
     try{
-      await writeFile(input,Buffer.concat(chunks));
+      let size=0;
+      await new Promise((resolveDone,reject)=>{
+        const out=createWriteStream(input,{flags:'wx'});
+        let settled=false;
+        const fail=e=>{if(!settled){settled=true;reject(e)}};
+        const done=()=>{if(!settled){settled=true;resolveDone()}};
+        out.on('error',fail); out.on('finish',done);
+        req.on('aborted',()=>fail(new Error('Client aborted upload')));
+        req.on('error',fail);
+        (async()=>{
+          try{
+            for await (const chunk of req){
+              size+=chunk.length;
+              if(size>max){out.destroy();fail(new Error('Video too large'));return;}
+              if(!out.write(chunk)) await new Promise(resolveDrain=>out.once('drain',resolveDrain));
+            }
+            out.end();
+          }catch(e){out.destroy();fail(e)}
+        })();
+      });
+      if(!size) return send(res,400,{'Content-Type':'application/json'},JSON.stringify({error:'Empty video upload'}));
       await new Promise((resolveDone,reject)=>{
         const p=spawn(process.env.FFMPEG_PATH || 'ffmpeg',[
           '-hide_banner','-loglevel','error','-y','-i',input,
-          '-map','0:v:0','-map','0:a:0?',
-          '-c:v','libx264','-preset','veryfast','-profile:v','high',
-          '-pix_fmt','yuv420p','-r','30','-movflags','+faststart',
+          '-map','0:v:0','-map','0:a:0?','-c:v','libx264','-preset','veryfast',
+          '-profile:v','high','-pix_fmt','yuv420p','-r','30','-movflags','+faststart',
           '-c:a','aac','-b:a','192k',output
-        ]);
+        ],{stdio:['ignore','ignore','pipe']});
         let err='',timer=setTimeout(()=>{try{p.kill('SIGKILL')}catch{};reject(new Error('FFmpeg conversion timed out'))},300000);
-        p.stderr.on('data',d=>{err+=d.toString()}); p.on('error',e=>{clearTimeout(timer);reject(e)});
+        p.stderr.on('data',d=>{err+=d.toString()});
+        p.on('error',e=>{clearTimeout(timer);reject(e)});
         p.on('close',code=>{clearTimeout(timer);code===0?resolveDone():reject(new Error(err.slice(-3000)||'FFmpeg conversion failed'))});
       });
-      const data=await readFile(output);
-      if(data.length<10000)throw new Error('FFmpeg produced an unexpectedly small MP4');
-      if(data.subarray(4,8).toString('ascii')!=='ftyp')throw new Error('FFmpeg output is not a valid MP4 container');
-      return send(res,200,{
-        'Content-Type':'video/mp4',
-        'Content-Length':data.length,
+      const info=await stat(output);
+      if(info.size<10000) throw new Error('FFmpeg produced an unexpectedly small MP4');
+      const fh=await open(output,'r');
+      try{
+        const header=Buffer.alloc(8);
+        const read=await fh.read(header,0,8,0);
+        if(read.bytesRead<8 || header.subarray(4,8).toString('ascii')!=='ftyp') throw new Error('FFmpeg output is not a valid MP4 container');
+      }finally{await fh.close()}
+      res.writeHead(200,{
+        'Content-Type':'video/mp4','Content-Length':info.size,
         'Content-Disposition':'attachment; filename="festival-of-bharat-edits-ready.mp4"',
-        'Cache-Control':'no-store',
-        'X-Reel-Format':'1080x1920 H.264 yuv420p 30fps'
-      },data);
+        'Cache-Control':'no-store','X-Reel-Format':'1080x1920 H.264 yuv420p 30fps'
+      });
+      const stream=createReadStream(output);
+      stream.on('error',e=>{console.error('MP4 response stream failed:',e);try{res.destroy(e)}catch{}});
+      stream.pipe(res);
+      return;
     }catch(e){
-      return send(res,500,{'Content-Type':'application/json','Cache-Control':'no-store'},JSON.stringify({error:'MP4 conversion failed',detail:String(e.message||e)}));
+      const message=String(e.message||e);
+      const status=message==='Video too large'?413:500;
+      return send(res,status,{'Content-Type':'application/json','Cache-Control':'no-store'},JSON.stringify({error:'MP4 conversion failed',detail:message}));
     }finally{ await Promise.allSettled([unlink(input),unlink(output)]); }
   }
   if(u.pathname==='/media-search'){
