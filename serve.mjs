@@ -27,13 +27,17 @@ const server=createServer(async(req,res)=>{
     if(!target) return send(res,400,{'Content-Type':'text/plain'},'Missing url');
     try{
       const t=new URL(target);
-      if(!['http:','https:'].includes(t.protocol)) return send(res,400,{'Content-Type':'text/plain'},'Unsupported protocol');
+      const host=t.hostname.toLowerCase().replace(/^\[|\]$/g,'');
+      const privateHost=host==='localhost'||host==='0.0.0.0'||host==='::1'||host.endsWith('.local')||/^127\./.test(host)||/^10\./.test(host)||/^192\.168\./.test(host)||/^169\.254\./.test(host)||/^172\.(1[6-9]|2\\d|3[0-1])\./.test(host);
+      if(!['http:','https:'].includes(t.protocol)||privateHost) return send(res,400,{'Content-Type':'text/plain'},'Unsupported url');
       const headers={
-        'User-Agent':'Festival-of-Bharat-Reel-Maker/1.0',
+        'User-Agent':'FestivalOfBharatReelMaker/1.4 (cultural reel studio; https://commons.wikimedia.org/)',
         'Accept':'image/avif,image/webp,image/apng,image/svg+xml,image/*,video/*,*/*;q=0.8'
       };
       if(req.headers.range) headers.Range=req.headers.range;
-      const r=await fetch(t,{redirect:'follow',headers});
+      const controller=new AbortController(),timer=setTimeout(()=>controller.abort(),15000);
+      let r;
+      try{r=await fetch(t,{redirect:'follow',headers,signal:controller.signal})}finally{clearTimeout(timer)}
       if(!r.ok) return send(res,r.status,{'Content-Type':'text/plain'},'Upstream '+r.status);
       const h={
         'Access-Control-Allow-Origin':'*',
@@ -125,7 +129,7 @@ const server=createServer(async(req,res)=>{
         for(const [k,v] of [
           ['action','query'],['format','json'],['formatversion','2'],['generator','search'],
           ['gsrsearch',searchTerm],['gsrnamespace','6'],['gsrlimit','100'],['gsrwhat','text'],
-          ['prop','imageinfo'],['iiprop','url|mime|size'],['iiurlwidth','900'],['origin','*']
+          ['prop','imageinfo'],['iiprop','url|size|mime|mediatype|extmetadata'],['iiextmetadatafilter','LicenseShortName|Artist|LicenseUrl'],['iiurlwidth','1400'],['origin','*']
         ]) api.searchParams.set(k,v);
         if(continuation) api.searchParams.set('gsrcontinue',continuation);
         const d=await fetchJson(api,{headers:{'User-Agent':'Festival-of-Bharat-Reel-Maker/1.3','Accept':'application/json'}},8000);
@@ -134,7 +138,7 @@ const server=createServer(async(req,res)=>{
           const kind=mime.startsWith('image/')?'image':mime.startsWith('video/')?'video':'';
           if(kind!==targetKind||!z?.url||seenPages.has(x.pageid))continue;
           seenPages.add(x.pageid);
-          collected.push({id:(kind==='video'?'wmv':'wm')+x.pageid,title:x.title||('Wikimedia Commons '+kind),source:'Wikimedia Commons',url:(kind==='image'&&z.thumburl)?z.thumburl:z.url,originalUrl:z.url,thumb:z.thumburl||z.url||'',kind});
+          const title=x.title||('Wikimedia Commons '+kind); const width=Number(z.width||0); const size=Number(z.size||0); if(kind==='image'&&width&&width<640)continue; if(kind==='video'&&size&&size>90_000_000)continue; const meta=z.extmetadata||{}; const clean=v=>String(v?.value||'').replace(/<[^>]+>/g,'').trim(); collected.push({id:(kind==='video'?'wmv':'wm')+x.pageid,title,source:'Wikimedia Commons',url:(kind==='image'&&z.thumburl)?z.thumburl:z.url,originalUrl:z.url,thumb:z.thumburl||z.url||'',kind,width,height:Number(z.height||0),mime,license:clean(meta.LicenseShortName),licenseUrl:clean(meta.LicenseUrl),author:clean(meta.Artist),pageUrl:'https://commons.wikimedia.org/wiki/Special:Redirect/file/'+encodeURIComponent(String(title).replace(/^File:/,''))});
           if(collected.length>=maxItems)break;
         }
         continuation=d?.continue?.gsrcontinue||null;
@@ -155,12 +159,12 @@ const server=createServer(async(req,res)=>{
     if(videoAttempt.status==='rejected')errors.push('Wikimedia videos: '+String(videoAttempt.reason?.message||videoAttempt.reason));
 
     // Openverse is only a photo fallback.
-    if(!results.some(x=>x.kind==='image')){
+    if(results.filter(x=>x.kind==='image').length<4){
       try{
         const api=new URL('https://api.openverse.org/v1/images/');
         api.searchParams.set('q',q); api.searchParams.set('page_size','100');
         api.searchParams.set('size','large'); api.searchParams.set('license_type','commercial,modification');
-        const d=await fetchJson(api,{headers:{'User-Agent':'Festival-of-Bharat-Reel-Maker/1.2','Accept':'application/json'}},10000);
+        const d=await fetchJson(api,{headers:{'User-Agent':'Festival-of-Bharat-Reel-Maker/1.4','Accept':'application/json'}},10000);
         for(const x of (d?.results||[])) if(x?.url) add({
           id:'ov'+x.id,title:x.title||'Untitled',source:'Openverse',
           url:x.url,thumb:x.thumbnail||x.url,kind:'image'
