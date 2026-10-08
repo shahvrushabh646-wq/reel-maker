@@ -863,13 +863,20 @@ $('export').onclick=async()=>{
      exportAudio=audioObj;
    }
  }catch(e){console.warn('Audio export unavailable',e);$('qc').textContent='QC: Video recording; audio could not be attached'}
- const mimeCandidates=['video/webm;codecs=vp8,opus','video/webm;codecs=vp9,opus','video/webm;codecs=vp8','video/webm'];
- const mime=mimeCandidates.find(x=>MediaRecorder.isTypeSupported(x))||'video/webm';
- let rec;
- try{rec=new MediaRecorder(stream,{mimeType:mime,videoBitsPerSecond:8000000})}
- catch(e){$('qc').textContent='QC: Browser cannot record this reel: '+String(e.message||e);stream.getTracks().forEach(t=>t.stop());return}
- const chunks=[];
- let stopped=false;
+ async function convertWebmToMp4InBrowser(webm){
+ const [{FFmpeg},{fetchFile,toBlobURL}]=await Promise.all([
+   import('https://cdn.jsdelivr.net/npm/@ffmpeg/ffmpeg@0.12.15/dist/esm/index.js'),
+   import('https://cdn.jsdelivr.net/npm/@ffmpeg/util@0.12.2/dist/esm/index.js')
+ ]);
+ const ffmpeg=new FFmpeg();
+ ffmpeg.on('progress',({progress})=>{if(Number.isFinite(progress))$('qc').textContent='QC: Converting WebM to MP4 / H.264… '+Math.round(progress*100)+'%'});
+ const base='https://cdn.jsdelivr.net/npm/@ffmpeg/core-st@0.12.10/dist/esm';
+ await ffmpeg.load({
+   coreURL:await toBlobURL(base+'/ffmpeg-core.js','text/javascript'),
+   wasmURL:await toBlobURL(base+'/ffmpeg-core.wasm','application/wasm')
+ });
+ await ffmpeg.writeFile('input.webm',await fetchFile(webm));
+ await ffmpeg.exec(['-i','input.webm','-map','0:v:0','-map','0:a:0?','-c:v','libx264','-preset','veryfast','-pix_fmt','yuv420p','-r','30','-m     const mp4=await convertWebmToMp4InBrowser(webm);d=false;
  rec.ondataavailable=e=>{if(e.data?.size)chunks.push(e.data)};
  rec.onerror=e=>{console.error('MediaRecorder error',e)};
  rec.onstop=async()=>{
