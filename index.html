@@ -362,8 +362,14 @@ async function search(q){
     // browser-side Wikimedia request is needed here.
     results.push(...out.filter(x=>x.kind==='image').slice(0,120),...out.filter(x=>x.kind==='video').slice(0,40));
     const pc=results.filter(x=>x.kind==='image').length, vc=results.filter(x=>x.kind==='video').length;
-    $('sourceStatus').textContent='Loaded '+pc+' photos + '+vc+' videos';
-    $('statusTop').textContent='READY';
+    if(!results.length){
+      const detail=(d?.errors||[]).filter(Boolean).join(' · ')||d?.error||d?.message||'No suitable photos or videos found.';
+      $('sourceStatus').textContent='Research returned 0 usable media — '+detail;
+      $('statusTop').textContent='NO RESULTS';
+    }else{
+      $('sourceStatus').textContent='Loaded '+pc+' photos + '+vc+' videos · '+(d?.source||'Wikimedia Commons');
+      $('statusTop').textContent='READY';
+    }
     sequence=[]; render(); renderToken++; draw(0);
   }catch(e){
     $('statusTop').textContent='ERROR';
