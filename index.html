@@ -201,35 +201,18 @@ function toggleTemplateDemo(event,button){
 }
 window.toggleTemplateDemo=toggleTemplateDemo;
 async function previewTemplate(i,event){
- event?.stopPropagation();
- if(!templates[Number(i)])return false;
- pickTemplate(Number(i));
+ event?.stopPropagation();if(!templates[Number(i)])return false;
+ playing=false;cancelAnimationFrame(raf);renderToken++;pickTemplate(Number(i));
  if(selected.length){
-   sequence=buildSequence();
-   renderToken++;
-   openWorkspace('preview');
-   try{
-     const ok=await draw(0);
-     if(!ok)throw new Error('Selected media could not be rendered with this template');
-     $('qc').textContent='QC: Preview · '+activeTemplate.name+' · '+sequence.length+' scenes';
-     playing=false;
-     start();
-     return true;
-   }catch(e){
-     $('qc').textContent='QC: Template preview failed — '+String(e.message||e);
-     return false;
-   }
+   sequence=buildSequence();openWorkspace('preview',{skipRender:true});
+   try{await validateSequenceMedia();const ok=await draw(0,true);if(!ok)return false;$('qc').textContent='QC: Preview · '+activeTemplate.name+' · '+sequence.length+' scenes';start();return true}
+   catch(e){$('qc').textContent='QC: Template preview failed — '+String(e.message||e);return false}
  }
- // No user media yet: keep the lightweight real-video demo as a visual reference.
  const card=document.querySelector('#templateList .templateCard[data-template-index="'+Number(i)+'"]');
- const v=card?.querySelector('video.templateDemoMedia');
- if(!v)return true;
- document.querySelectorAll('#templateList video.templateDemoMedia').forEach(x=>{if(x!==v){try{x.pause()}catch{} }});
- if(!v.src){v.src=v.dataset.src||'';v.preload='auto';}
- v.muted=true;v.defaultMuted=true;v.playsInline=true;v.controls=true;v.currentTime=0;
- const p=v.play();
- if(p&&p.catch)p.catch(()=>{ $('qc').textContent='QC: Template demo could not autoplay — use the video play control'; });
- return true;
+ const v=card?.querySelector('video.templateDemoMedia');if(!v)return true;
+ document.querySelectorAll('#templateList video.templateDemoMedia').forEach(x=>{if(x!==v){try{x.pause()}catch{}}});
+ if(!v.src){v.src=v.dataset.src||'';v.preload='auto'}v.muted=true;v.defaultMuted=true;v.playsInline=true;v.controls=true;v.currentTime=0;
+ const p=v.play();if(p&&p.catch)p.catch(()=>{$('qc').textContent='QC: Template demo could not autoplay — use the video play control'});return true;
 }
 window.previewTemplate=previewTemplate;
 
@@ -263,27 +246,37 @@ function renderTemplates(){
 }
 
 function pickTemplate(i){
- activeTemplate=templates[i];$('templateName').textContent=activeTemplate.name;$('templateDesc').textContent=activeTemplate.desc;
- $('duration').value=activeTemplate.dur;$('mix').value=100-activeTemplate.mix;$('durVal').textContent=activeTemplate.dur+'s';
+ if(!templates[i])return false;
+ activeTemplate=templates[i];
+ $('templateName').textContent=activeTemplate.name;
+ $('templateDesc').textContent=activeTemplate.desc;
+ $('duration').value=activeTemplate.dur;
+ $('mix').value=100-activeTemplate.mix;
+ $('durVal').textContent=activeTemplate.dur+'s';
  $('style').value=activeTemplate.cat==='Devotional'?'Devotional':activeTemplate.cat==='Festival'?'Festival':activeTemplate.cat==='Energetic'?'Energetic':activeTemplate.cat==='Storytelling'?'Storytelling':'Cinematic';
  $('scenePlan').innerHTML=activeTemplate.scenes.map(s=>'<span class="scene-chip">'+esc(s[1])+'</span>').join('');
- sequence=buildSequence();renderTemplates();update();renderToken++;draw(0);
+ sequence=buildSequence();
+ renderTemplates();
+ update();
+ renderToken++;
+ return true;
 }
 async function runTemplate(i){
  if(!templates[i])return false;
- pickTemplate(i);
- openWorkspace('preview');
+ playing=false;cancelAnimationFrame(raf);renderToken++;
+ pickTemplate(i);openWorkspace('preview',{skipRender:true});
  setTimeout(()=>playTemplateVideos(document),60);
- if(!selected.length){
-   $('qc').textContent='QC: Template applied — select media to build the reel';
-   return true;
- }
- sequence=buildSequence();renderToken++;
- await new Promise(requestAnimationFrame);
- const ok=await draw(0);
- if(!ok){$('qc').textContent='QC: Template applied, but selected media could not be loaded';return false;}
- $('qc').textContent='QC: '+sequence.length+' scenes · '+activeTemplate.name+' · ready to play';
- playing=false;start();return true;
+ if(!selected.length){$('qc').textContent='QC: Template selected — select media to build the reel';return true}
+ sequence=buildSequence();
+ if(!sequence.length){$('qc').textContent='QC: Template selected — selected media could not create scenes';return false}
+ await new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve)));
+ try{
+   await validateSequenceMedia();
+   const ok=await draw(0,true);
+   if(!ok)return false;
+   $('qc').textContent='QC: Reel built · '+sequence.length+' scenes · '+activeTemplate.name+' · READY';
+   start();return true;
+ }catch(e){$('qc').textContent='QC: Template build failed — '+String(e.message||e);return false}
 }
 window.setCat=c=>{templateCat=c;renderTemplates()};
 window.pickTemplate=pickTemplate;window.runTemplate=runTemplate;
@@ -464,7 +457,41 @@ async function draw(t,captureFrame=false){
        }
      }catch{}
    }
-   fit(ctx,media,c.width,c.height,z,px,py,rot);
+async function renderTemplateMedia(ctx,media,scene,local,idx,slot,captureFrame){
+ const design=String(activeTemplate?.design||'Minimal Type');
+ const box=(x,y,w,h,zoom=1,ox=0,oy=0,rotation=0)=>{ctx.save();ctx.beginPath();ctx.rect(x,y,w,h);ctx.clip();fit(ctx,media,w,h,zoom,ox,oy,rotation);ctx.restore()};
+ const panel=(x,y,w,h,fill)=>{ctx.fillStyle=fill;ctx.fillRect(x,y,w,h)};
+ const editorial=['Editorial Split','Magazine Cover','News Flash','Vertical Label','Travel Diary'].includes(design);
+ const frame=['Polaroid Stack','Film Strip','Vintage Frame','Sacred Frame','Classic Cinema'].includes(design);
+ const bold=['Bold Statement','Kinetic Caption','Neon Edge','Gradient Poster','Dynamic Crop'].includes(design);
+ const journal=['Soft Journal','Retro Analog','Photo Dump','Doodle Notes','Memory Album'].includes(design);
+ const grid=['Collage Grid','Modern Blocks','Split Screen','Festival Cards','Type + Image'].includes(design);
+ if(editorial){
+   if(design==='Editorial Split'){panel(0,0,1080,1920,'#0d1014');box(390,0,690,1920,1.05,px,py,rot)}
+   else if(design==='Magazine Cover'){box(0,0,1080,1320,1.03,px,py,rot);panel(0,1320,1080,600,'rgba(245,240,230,.96)')}
+   else if(design==='News Flash'){panel(0,0,1080,250,'#080a0c');box(0,230,1080,1180,1.06,px,py,rot);panel(0,1410,1080,510,'rgba(180,35,30,.94)')}
+   else if(design==='Vertical Label'){panel(0,0,1080,1920,'#090b0e');box(80,0,920,1920,1.08,px,py,rot);panel(0,0,80,1920,'#080a0c');panel(1000,0,80,1920,'#080a0c')}
+   else {box(0,260,1080,1320,1.08,px,py,rot);panel(0,0,1080,310,'rgba(8,10,12,.92)');panel(0,1580,1080,340,'rgba(8,10,12,.88)')}
+ }else if(frame){
+   if(design==='Polaroid Stack'){
+     panel(0,0,1080,1920,'#151515');ctx.save();ctx.translate(540,950);ctx.rotate(-.025);ctx.fillStyle='#f4f0e8';ctx.fillRect(-425,-610,850,1220);ctx.save();ctx.beginPath();ctx.rect(-395,-575,790,930);ctx.clip();fit(ctx,media,790,930,1.05,px,py,0);ctx.restore();ctx.restore()
+   }else if(design==='Film Strip'){
+     panel(0,0,1080,1920,'#090909');box(95,210,890,1500,1.03,px,py,rot);ctx.fillStyle='#050505';ctx.fillRect(0,0,1080,170);ctx.fillRect(0,1750,1080,170);for(let y=32;y<1880;y+=95){ctx.fillStyle='#ddd';ctx.fillRect(18,y,48,58);ctx.fillRect(1014,y,48,58)}
+   }else{
+     panel(0,0,1080,1920,design==='Sacred Frame'?'#0e1013':'#111');box(70,95,940,1580,1.05,px,py,rot);ctx.strokeStyle=design==='Sacred Frame'?'rgba(225,205,155,.9)':'rgba(255,255,255,.85)';ctx.lineWidth=10;ctx.strokeRect(48,72,984,1625)
+   }
+ }else if(bold){
+   box(0,0,1080,1920,1.08,px,py,rot);panel(0,0,1080,330,'rgba(0,0,0,.64)');
+   if(design==='Dynamic Crop'){panel(0,0,1080,1920,'#0b0d10');box(70,260,940,1250,1.22,px*1.5,py*1.5,rot)}
+   if(design==='Neon Edge'){ctx.strokeStyle='rgba(255,255,255,.9)';ctx.lineWidth=7;ctx.strokeRect(28,28,1024,1864)}
+ }else if(journal){
+   panel(0,0,1080,1920,'#e8e0d1');box(75,190,930,1260,1.04,px,py,rot);panel(55,1490,970,300,'rgba(248,243,232,.98)');ctx.strokeStyle='rgba(40,35,28,.35)';ctx.lineWidth=2;ctx.strokeRect(55,1490,970,300)
+ }else if(grid){
+   panel(0,0,1080,1920,'#0b0d10');const gap=18,x=50,y=170,w=480,h=760;box(x,y,w,h,1.08,px,py,rot);box(x+w+gap,y,w,h,1.08,-px,-py,-rot);box(x,y+h+gap,w,h,1.12,py,px,rot);box(x+w+gap,y+h+gap,w,h,1.08,-py,-px,-rot)
+ }else{box(0,0,1080,1920,1.04,px,py,rot)}
+}
+
+   await renderTemplateMedia(ctx,media,scene,local,idx,slot,captureFrame);
    if(activeTemplate.transition==='fade'&&local<.14){ctx.fillStyle='rgba(0,0,0,'+((.14-local)/.14)+')';ctx.fillRect(0,0,c.width,c.height)}
    if(activeTemplate.transition==='flash'&&local<.07){ctx.fillStyle='rgba(255,255,255,'+((.07-local)/.07*.35)+')';ctx.fillRect(0,0,c.width,c.height)}
    overlay(ctx,idx,scene.label);
@@ -501,67 +528,21 @@ async function ensureSelectedFontReady(){
  return family;
 }
 function overlay(ctx,idx,label){
- const design=String(activeTemplate?.design||'Minimal Type');
- const ff=$('fontFamily')?.value||'Noto Sans';
- const fw=$('fontWeight')?.value||'700';
- const total=sequence.length||selected.length;
- const txt=$('captionText')?.value?.trim();
- ctx.save();
- ctx.textBaseline='middle';
- // Every template family gets a genuinely different composition, not just a different name.
- const isEditorial=['Editorial Split','Magazine Cover','News Flash','Vertical Label','Travel Diary'].includes(design);
- const isFrame=['Polaroid Stack','Film Strip','Vintage Frame','Sacred Frame','Classic Cinema'].includes(design);
- const isBold=['Bold Statement','Kinetic Caption','Neon Edge','Gradient Poster','Dynamic Crop'].includes(design);
- const isJournal=['Soft Journal','Retro Analog','Photo Dump','Doodle Notes','Memory Album'].includes(design);
- const isGrid=['Collage Grid','Modern Blocks','Split Screen','Festival Cards','Type + Image'].includes(design);
- const isSerif=['Luxury Serif','Clean Quote','Black White','Ripped Paper','Minimal Type'].includes(design);
- const isVertical=design==='Vertical Label';
- const isMagazine=design==='Magazine Cover';
- if(isEditorial){
-   ctx.fillStyle='rgba(0,0,0,.62)';ctx.fillRect(0,0,1080,205);
-   ctx.fillStyle='#fff';ctx.fillRect(50,44,120,5);
-   ctx.fillStyle='#fff';ctx.font=fw+' 48px "'+ff+'",sans-serif';ctx.fillText('Festival of Bharat',50,92);
-   ctx.font='600 25px "'+ff+'",sans-serif';ctx.fillStyle='rgba(255,255,255,.78)';ctx.fillText((idx+1)+' / '+total+'  ·  '+(label||''),50,145);
-   if(isMagazine){ctx.font='700 22px "'+ff+'",sans-serif';ctx.fillStyle='rgba(255,255,255,.72)';ctx.fillText('CULTURE · HERITAGE · INDIA',50,180);}
- }else if(isFrame){
-   ctx.strokeStyle='rgba(255,255,255,.9)';ctx.lineWidth=12;ctx.strokeRect(28,28,1024,1924);
-   ctx.fillStyle='rgba(0,0,0,.58)';ctx.fillRect(48,1640,984,220);
-   ctx.fillStyle='#fff';ctx.font=fw+' 46px "'+ff+'",sans-serif';ctx.fillText('Festival of Bharat',78,1700);
-   ctx.font='600 27px "'+ff+'",sans-serif';ctx.fillStyle='rgba(255,255,255,.78)';ctx.fillText((idx+1)+' / '+total+' · '+(label||''),78,1760);
- }else if(isBold){
-   ctx.fillStyle='rgba(0,0,0,.48)';ctx.fillRect(0,0,1080,170);
-   ctx.fillStyle='#fff';ctx.font='900 58px "'+ff+'",sans-serif';ctx.fillText((idx+1)+'  '+(label||'MOMENT'),48,88);
-   ctx.fillStyle='rgba(255,255,255,.9)';ctx.fillRect(48,128,250,8);
-   if(design==='Neon Edge'){ctx.strokeStyle='rgba(255,255,255,.75)';ctx.lineWidth=5;ctx.strokeRect(22,22,1036,1936);}
- }else if(isJournal){
-   ctx.fillStyle='rgba(245,240,230,.92)';ctx.fillRect(45,45,990,185);
-   ctx.fillStyle='#171717';ctx.font='700 42px "'+ff+'",sans-serif';ctx.fillText('Festival of Bharat',72,105);
-   ctx.font='600 24px "'+ff+'",sans-serif';ctx.fillStyle='rgba(23,23,23,.68)';ctx.fillText((idx+1)+'  ·  '+(label||'')+'  ·  '+design.toUpperCase(),72,158);
-   ctx.strokeStyle='rgba(23,23,23,.28)';ctx.lineWidth=2;ctx.beginPath();ctx.moveTo(72,195);ctx.lineTo(1005,195);ctx.stroke();
- }else if(isGrid){
-   ctx.fillStyle='rgba(0,0,0,.58)';ctx.fillRect(35,35,1010,190);
-   ctx.fillStyle='#fff';ctx.font='800 44px "'+ff+'",sans-serif';ctx.fillText('Festival of Bharat',62,95);
-   ctx.font='600 26px "'+ff+'",sans-serif';ctx.fillText((idx+1)+' / '+total+' · '+(label||''),62,148);
-   ctx.strokeStyle='rgba(255,255,255,.7)';ctx.lineWidth=3;ctx.strokeRect(35,35,1010,190);
-   ctx.beginPath();ctx.moveTo(540,35);ctx.lineTo(540,225);ctx.stroke();
- }else{
-   ctx.fillStyle='rgba(0,0,0,.38)';ctx.fillRect(0,0,1080,220);
-   ctx.fillStyle='#fff';ctx.font=fw+' 54px "'+ff+'",sans-serif';ctx.fillText('Festival of Bharat',50,92);
-   ctx.font='600 32px "'+ff+'",sans-serif';ctx.fillText((idx+1)+' / '+total+' · '+(label||''),50,155);
-   if(isSerif){ctx.strokeStyle='rgba(255,255,255,.65)';ctx.lineWidth=2;ctx.beginPath();ctx.moveTo(50,190);ctx.lineTo(1030,190);ctx.stroke();}
- }
- if(isVertical){
-   ctx.save();ctx.translate(1015,980);ctx.rotate(-Math.PI/2);ctx.fillStyle='#fff';ctx.font='800 30px "'+ff+'",sans-serif';ctx.fillText('FESTIVAL OF BHARAT',0,0);ctx.restore();
- }
- if(txt){
-   ctx.textAlign='center';ctx.font=fw+' '+(($('fontSize')?.value||34)*2)+'px "'+ff+'",sans-serif';
-   const y=$('captionPos').value==='top'?310:$('captionPos').value==='middle'?1000:1750;
-   const h=116;
-   if(isBold){ctx.fillStyle='rgba(0,0,0,.68)';ctx.fillRect(35,y-86,1010,h);}
-   else if(isJournal){ctx.fillStyle='rgba(245,240,230,.92)';ctx.fillRect(55,y-86,970,h);}
-   else{ctx.fillStyle='rgba(0,0,0,.48)';ctx.fillRect(50,y-86,980,h);}
-   ctx.fillStyle=isJournal?'#171717':'#fff';ctx.fillText(txt,540,y);ctx.textAlign='left';
- }
+ const design=String(activeTemplate?.design||'Minimal Type'),ff=$('fontFamily')?.value||'Noto Sans',fw=$('fontWeight')?.value||'700';
+ const total=sequence.length||selected.length,txt=$('captionText')?.value?.trim(),size=Math.max(20,Number($('fontSize')?.value||34)),title=(label||'Festival of Bharat').toUpperCase();
+ ctx.save();ctx.textBaseline='middle';
+ const text=(v,x,y,font,fill='#fff',align='left')=>{ctx.font=font;ctx.fillStyle=fill;ctx.textAlign=align;ctx.fillText(v,x,y)};
+ if(design==='Editorial Split'){text('FESTIVAL OF BHARAT',55,90,'700 24px "'+ff+'",sans-serif','#aaa');text(title,55,360,'900 64px "'+ff+'",sans-serif');text(String(idx+1).padStart(2,'0')+' / '+String(total).padStart(2,'0'),55,1840,'600 24px "'+ff+'",sans-serif','#aaa')}
+ else if(design==='Magazine Cover'){text('BHARAT',54,80,'900 44px "'+ff+'",sans-serif','#111');text(title,55,1400,'900 66px "'+ff+'",sans-serif','#111');text('CULTURE · HERITAGE · INDIA',55,1480,'600 22px "'+ff+'",sans-serif','#555')}
+ else if(design==='News Flash'){text('CULTURE NOW',48,100,'900 30px "'+ff+'",sans-serif');text(title,48,1500,'900 68px "'+ff+'",sans-serif')}
+ else if(design==='Vertical Label'){ctx.save();ctx.translate(42,980);ctx.rotate(-Math.PI/2);text('FESTIVAL OF BHARAT',0,0,'800 24px "'+ff+'",sans-serif');ctx.restore();text(title,930,1790,'800 38px "'+ff+'",sans-serif','#fff','right')}
+ else if(design==='Polaroid Stack'){text(title,540,1515,'800 44px "'+ff+'",sans-serif','#171717','center');text('FESTIVAL OF BHARAT · '+String(idx+1).padStart(2,'0'),540,1580,'600 20px "'+ff+'",sans-serif','#555','center')}
+ else if(['Film Strip','Vintage Frame','Sacred Frame','Classic Cinema'].includes(design)){text(title,75,1770,'800 48px "'+ff+'",sans-serif');text(String(idx+1)+' / '+total,75,1830,'600 22px "'+ff+'",sans-serif','rgba(255,255,255,.72)')}
+ else if(['Collage Grid','Modern Blocks','Split Screen','Festival Cards','Type + Image'].includes(design)){text('THE DETAIL',55,105,'800 25px "'+ff+'",sans-serif');text(title,55,1830,'800 48px "'+ff+'",sans-serif')}
+ else if(['Soft Journal','Retro Analog','Photo Dump','Doodle Notes','Memory Album'].includes(design)){text('FESTIVAL OF BHARAT',78,105,'800 34px "'+ff+'",sans-serif','#171717');text(title,78,1570,'800 48px "'+ff+'",sans-serif','#171717')}
+ else if(['Bold Statement','Kinetic Caption','Neon Edge','Gradient Poster','Dynamic Crop'].includes(design)){text(title,50,115,'900 64px "'+ff+'",sans-serif');text(String(idx+1).padStart(2,'0'),1010,115,'900 38px "'+ff+'",sans-serif','rgba(255,255,255,.72)','right')}
+ else{text('FESTIVAL OF BHARAT',50,90,'700 24px "'+ff+'",sans-serif','rgba(255,255,255,.78)');text(title,50,1770,'800 54px "'+ff+'",sans-serif')}
+ if(txt){const pos=$('captionPos').value,y=pos==='top'?300:pos==='middle'?1020:1690;ctx.textAlign='center';ctx.fillStyle=(design==='Magazine Cover'||['Soft Journal','Retro Analog','Photo Dump','Doodle Notes','Memory Album'].includes(design))?'rgba(245,240,230,.9)':'rgba(0,0,0,.58)';ctx.fillRect(50,y-70,980,140);ctx.fillStyle=(design==='Magazine Cover'||['Soft Journal','Retro Analog','Photo Dump','Doodle Notes','Memory Album'].includes(design))?'#171717':'#fff';ctx.font=fw+' '+(size*2)+'px "'+ff+'",sans-serif';ctx.fillText(txt,540,y)}
  ctx.restore();
 }
 function start(){if(playing)return;playing=true;started=performance.now();const f=async n=>{if(!playing)return;const ok=await draw((n-started)/1000);if(!ok){playing=false;cancelAnimationFrame(raf);return}if(playing)raf=requestAnimationFrame(f)};raf=requestAnimationFrame(f)}
