@@ -151,39 +151,35 @@ const server=createServer(async(req,res)=>{
       throw last;
     };
 
-    const searchWikimedia=async(searchTerm,targetKind,maxItems=60)=>{
+    const searchWikimedia=async(searchTerm,targetKind,maxItems=100)=>{
       const collected=[]; const seenPages=new Set(); let continuation=null;
-      const fileFilter = targetKind==='video'
-        ? 'filetype:video OR filetype:ogg'
-        : 'filetype:bitmap OR filetype:drawing OR filetype:image';
-      const term = `(${searchTerm}) ${fileFilter}`;
-      for(let page=0; page<3 && collected.length<maxItems; page++){
+      for(let page=0; page<4 && collected.length<maxItems; page++){
         const api=new URL('https://commons.wikimedia.org/w/api.php');
         for(const [k,v] of [
           ['action','query'],['format','json'],['formatversion','2'],['generator','search'],
-          ['gsrsearch',term],['gsrnamespace','6'],['gsrlimit','50'],['gsrwhat','text'],
-          ['prop','imageinfo'],['iiprop','url|mime|size|thumbmime'],['iiurlwidth','900'],['origin','*']
+          ['gsrsearch',searchTerm],['gsrnamespace','6'],['gsrlimit','100'],['gsrwhat','text'],
+          ['prop','imageinfo'],['iiprop','url|mime|size|thumbmime'],['iiurlwidth','1000'],['origin','*']
         ]) api.searchParams.set(k,v);
         if(continuation) api.searchParams.set('gsrcontinue',continuation);
         const d=await withRetry(()=>fetchJson(api,{
           headers:{
-            'User-Agent':'Festival-of-Bharat-Reel-Maker/1.4 (https://festivalofbharat; media research; contact via app)',
+            'User-Agent':'Festival-of-Bharat-Reel-Maker/1.4',
             'Accept':'application/json'
           }
         },10000));
         for(const x of (d?.query?.pages||[])){
-          const z=x?.imageinfo?.[0], mime=String(z?.mime||'').toLowerCase();
+          const z=x?.imageinfo?.[0];
+          const mime=String(z?.mime||'').toLowerCase();
           const kind=mime.startsWith('image/')?'image':mime.startsWith('video/')?'video':'';
-          if(kind!==targetKind || !z?.url || seenPages.has(x.pageid)) continue;
-          seenPages.add(x.pageid);
-          const thumb = z.thumburl || (kind==='image' ? z.url : '');
+          if(kind!==targetKind || !z?.url || seenPages.has(String(x.pageid))) continue;
+          seenPages.add(String(x.pageid));
           collected.push({
             id:(kind==='video'?'wmv':'wm')+x.pageid,
-            title:(x.title||'').replace(/^File:/,'').replace(/\.[^.]+$/,'' ) || ('Wikimedia '+kind),
+            title:(x.title||'').replace(/^File:/,'') || ('Wikimedia Commons '+kind),
             source:'Wikimedia Commons',
-            url: kind==='image' && z.thumburl ? z.thumburl : z.url,
+            url:(kind==='image' && z.thumburl)?z.thumburl:z.url,
             originalUrl:z.url,
-            thumb: thumb || z.url || '',
+            thumb:z.thumburl||z.url||'',
             kind
           });
           if(collected.length>=maxItems) break;
@@ -193,6 +189,47 @@ const server=createServer(async(req,res)=>{
       }
       return collected;
     };
+
+    const searchWikimediaFallback=async(searchTerm,targetKind,maxItems=60)=>{
+      const collected=[]; const seen=new Set();
+      const api=new URL('https://commons.wikimedia.org/w/api.php');
+      for(const [k,v] of [
+        ['action','query'],['format','json'],['formatversion','2'],['list','search'],
+        ['srsearch',searchTerm],['srnamespace','6'],['srlimit','100'],['srwhat','text'],
+        ['origin','*']
+      ]) api.searchParams.set(k,v);
+      const d=await withRetry(()=>fetchJson(api,{
+        headers:{'User-Agent':'Festival-of-Bharat-Reel-Maker/1.4','Accept':'application/json'}
+      },10000));
+      const titles=(d?.query?.search||[]).map(x=>x?.title).filter(Boolean);
+      for(let i=0;i<titles.length && collected.length<maxItems;i+=25){
+        const batch=titles.slice(i,i+25).join('|');
+        const info=new URL('https://commons.wikimedia.org/w/api.php');
+        for(const [k,v] of [
+          ['action','query'],['format','json'],['formatversion','2'],['prop','imageinfo'],
+          ['titles',batch],['iiprop','url|mime|size|thumbmime'],['iiurlwidth','1000'],['origin','*']
+        ]) info.searchParams.set(k,v);
+        const d2=await withRetry(()=>fetchJson(info,{
+          headers:{'User-Agent':'Festival-of-Bharat-Reel-Maker/1.4','Accept':'application/json'}
+        },10000));
+        for(const x of (d2?.query?.pages||[])){
+          const z=x?.imageinfo?.[0], mime=String(z?.mime||'').toLowerCase();
+          const kind=mime.startsWith('image/')?'image':mime.startsWith('video/')?'video':'';
+          if(kind!==targetKind || !z?.url || seen.has(x.pageid)) continue;
+          seen.add(x.pageid);
+          collected.push({
+            id:(kind==='video'?'wmv':'wm')+x.pageid,
+            title:(x.title||'').replace(/^File:/,''),
+            source:'Wikimedia Commons',
+            url:(kind==='image'&&z.thumburl)?z.thumburl:z.url,
+            originalUrl:z.url,thumb:z.thumburl||z.url||'',kind
+          });
+          if(collected.length>=maxItems) break;
+        }
+      }
+      return collected;
+    };
+
 
     const searchOpenverseImages=async(searchTerm,maxItems=80)=>{
       const collected=[];
