@@ -301,9 +301,20 @@ const server=createServer(async(req,res)=>{
       }catch(e){ errors.push('Google images: '+String(e.message||e)); return []; }
     };
 
+    const wmPhotoPromise=searchWikimedia(q,'image',100).catch(async e=>{
+      errors.push('Wikimedia photos primary: '+String(e.message||e));
+      try{return await searchWikimediaFallback(q,'image',80)}catch(e2){
+        errors.push('Wikimedia photos fallback: '+String(e2.message||e2)); return [];
+      }
+    });
+    const wmVideoPromise=searchWikimedia(q,'video',100).catch(async e=>{
+      errors.push('Wikimedia videos primary: '+String(e.message||e));
+      try{return await searchWikimediaFallback(q,'video',60)}catch(e2){
+        errors.push('Wikimedia videos fallback: '+String(e2.message||e2)); return [];
+      }
+    });
     const [wmPhotos,wmVideos,ovPhotos,ovVideos,gPhotos]=await Promise.all([
-      searchWikimedia(q,'image',60).catch(e=>{errors.push('Wikimedia photos: '+String(e.message||e));return[];}),
-      searchWikimedia(q,'video',40).catch(e=>{errors.push('Wikimedia videos: '+String(e.message||e));return[];}),
+      wmPhotoPromise,wmVideoPromise,
       searchOpenverseImages(q,80).catch(e=>{errors.push('Openverse photos: '+String(e.message||e));return[];}),
       searchOpenverseVideos(q,40).catch(e=>{errors.push('Openverse videos: '+String(e.message||e));return[];}),
       searchGoogleImages(q,20).catch(e=>{errors.push('Google images: '+String(e.message||e));return[];})
