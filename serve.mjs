@@ -108,7 +108,7 @@ const server=createServer(async(req,res)=>{
     }finally{ await Promise.allSettled([unlink(input),unlink(output)]); }
   }
   if(u.pathname==='/media-search'){
-    const q=(u.searchParams.get('q')||'').replace(/\\s+/g,' ').trim().slice(0,180);
+    const q=(u.searchParams.get('q')||'').replace(/\s+/g,' ').trim().slice(0,180);
     const offset=Math.max(0,Number(u.searchParams.get('offset')||0)||0);
     if(!q) return send(res,400,{'Content-Type':'application/json','Cache-Control':'no-store'},JSON.stringify({
       results:[],nextOffset:null,source:'Wikimedia Commons',
@@ -133,15 +133,15 @@ const server=createServer(async(req,res)=>{
       [/pongal|onam|baisakhi|lohri|bihu/i,['India harvest festival']]
     ];
     const variantsFor=query=>{
-      const clean=query.replace(/\\s+/g,' ').trim();
+      const clean=query.replace(/\s+/g,' ').trim();
       const extra=(HINTS.find(([pattern])=>pattern.test(clean))||[])[1]||[];
       const list=[clean];
       if(!/india|festival|temple/i.test(clean)) list.push(clean+' festival India');
       for(const item of extra) if(!list.some(v=>v.toLowerCase()===item.toLowerCase())) list.push(item);
       return list.slice(0,3);
     };
-    const rejectTitle=title=>/(icon|logo|pictogram|coat of arms|locator map|flag of|diagram|watermark|symbol|svg\\b|banner\\b)/i.test(title);
-    const stripHtml=value=>String(value||'').replace(/<[^>]+>/g,' ').replace(/&amp;/g,'&').replace(/&quot;/g,'\"').replace(/&#039;|'/g,"'").replace(/&lt;/g,'<').replace(/&gt;/g,'>').replace(/\\s+/g,' ').trim().slice(0,180);
+    const rejectTitle=title=>/(icon|logo|pictogram|coat of arms|locator map|flag of|diagram|watermark|symbol|svg\b|banner\b)/i.test(title);
+    const stripHtml=value=>String(value||'').replace(/<[^>]+>/g,' ').replace(/&amp;/g,'&').replace(/&quot;/g,'\"').replace(/&#039;|'/g,"'").replace(/&lt;/g,'<').replace(/&gt;/g,'>').replace(/\s+/g,' ').trim().slice(0,180);
 
     const fetchJson=async(url,ms=12000)=>{
       const started=Date.now(); let last='request failed'; let wait=350;
