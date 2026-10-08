@@ -150,11 +150,7 @@ const templateCatalog=RECENT_ZIP_TEMPLATES.map(t=>({...t,renderLayout:layoutAlia
 const templates=templateCatalog.map(t=>({...t,design:t.layout,mix:50,speed:t.motion==='slow-push'||t.motion==='slow-pull'?'slow':t.motion==='crop-punch'?'fast':'mixed',scenes:t.beats}));
 let templateTab='for-you',templateShelf='All',templateCat='All',templateSearch='',templatePage=24,sequence=[],renderToken=0,activeTemplate=templates[0];
 const speedMeta={Slow:{dur:[24,26,28,30],speed:'slow'},Mixed:{dur:[14,16,18,20],speed:'mixed'},Fast:{dur:[8,9,10,12],speed:'fast'}};
-const templates=templateCatalog.map((t,i)=>({...t,mix:50,speed:t.cat.toLowerCase(),design:t.layout,scenes:
- t.cat==='Fast'?[['HOOK','Hook'],['FAST','Cut'],['FAST','Detail'],['PEAK','Peak'],['END','CTA']]:
- t.cat==='Mixed'?[['OPEN','Set the scene'],['HERO','Hero'],['DETAIL','Detail'],['FAST','Energy'],['PEAK','Payoff'],['END','Close']]:
- [['OPEN','Atmosphere'],['HERO','Main moment'],['DETAIL','Detail'],['MOTION','Movement'],['PEAK','Highlight'],['END','Meaning']]
-}));
+
 
 function update(){ $('photoCount').textContent=results.filter(x=>x.kind==='image').length;$('videoCount').textContent=results.filter(x=>x.kind==='video').length;$('selectedCount').textContent=selected.length;$('mixVal').textContent=(100-+$('mix').value)+' / '+$('mix').value; }
 let mediaTab='photos';
