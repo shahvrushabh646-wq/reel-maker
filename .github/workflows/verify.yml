@@ -18,3 +18,5 @@ jobs:
       - run: node --check /tmp/app-script-0.js
       - run: node --check /tmp/app-script-1.js
       - run: node --check /tmp/app-script-2.js
+      - run: node --check recent-templates.js
+      - run: node --check recent-look.js
