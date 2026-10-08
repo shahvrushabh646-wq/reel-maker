@@ -925,6 +925,9 @@ $('export').onclick=async()=>{
  const exportVideos=selected.filter(x=>x?.kind==='video');
  const exportImages=selected.filter(x=>x?.kind==='image');
  if(exportVideos.length && !exportImages.length){
+   // Load every explicitly selected video, not only videos used by the
+   // preview template, so export duration always reflects the real sources.
+   await Promise.all(exportVideos.map(v=>loadVideo(v)));
    const sourceDurations=exportVideos.map(x=>{
      const v=videoCache.get(x.id);
      return v?.duration && Number.isFinite(v.duration) ? Number(v.duration) : 0;
