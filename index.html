@@ -482,15 +482,6 @@ async function search(q){
   }
 }
 $('form').onsubmit=e=>{e.preventDefault();search($('q').value.trim())};
-function autoSelect(){
- selected.length=0;
- const im=results.filter(x=>x.kind==='image'),vi=results.filter(x=>x.kind==='video');
- // Adaptive selection: never require a 50/50 library. One photo or one video is enough to build a reel.
- if(!im.length&&vi.length){for(let i=0;i<Math.min(16,vi.length);i++)selected.push(vi[i]);}
- else if(!vi.length&&im.length){for(let i=0;i<Math.min(16,im.length);i++)selected.push(im[i]);}
- else {let a=0,b=0;while(selected.length<16&&(a<im.length||b<vi.length)){if(selected.length%2===0&&a<im.length)selected.push(im[a++]);else if(b<vi.length)selected.push(vi[b++]);else if(a<im.length)selected.push(im[a++]);}}
- update();
-}
 $('generate').onclick=async()=>{if(!selected.length){openWorkspace('media');$('qc').textContent='QC: Select media first — search results are not auto-selected';return false}sequence=buildSequence();renderToken++;openWorkspace('preview');await new Promise(requestAnimationFrame);const ok=await $('build').click();if(ok&&!playing)start();return ok};
 const imageCache=new Map(),videoCache=new Map();
 function fit(ctx,s,cw,ch,z=1,panX=0,panY=0,rot=0){const w=s.videoWidth||s.naturalWidth||s.width,h=s.videoHeight||s.naturalHeight||s.height;if(!w||!h)return false;const sc=Math.max(cw/w,ch/h)*z;ctx.save();ctx.translate(cw/2+panX,ch/2+panY);ctx.rotate(rot);ctx.drawImage(s,-w*sc/2,-h*sc/2,w*sc,h*sc);ctx.restore();return true}
