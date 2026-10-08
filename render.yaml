@@ -1,10 +1,10 @@
 services:
   - type: web
     name: reel-maker
-    runtime: node
+    runtime: docker
     plan: free
-    buildCommand: npm install --no-audit --no-fund --fetch-retries=5 --fetch-retry-mintimeout=2000 --fetch-retry-maxtimeout=20000
-    startCommand: npm start
+    dockerfilePath: ./Dockerfile
+    dockerContext: .
     healthCheckPath: /health
     envVars:
       - key: JAMENDO_CLIENT_ID
@@ -12,4 +12,10 @@ services:
       - key: GOOGLE_CSE_KEY
         sync: false
       - key: GOOGLE_CSE_ID
+        sync: false
+      - key: YOUTUBE_API_KEY
+        sync: false
+      - key: SPOTIFY_CLIENT_ID
+        sync: false
+      - key: SPOTIFY_CLIENT_SECRET
         sync: false
