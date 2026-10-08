@@ -422,6 +422,25 @@ async function search(q){
   $('statusTop').textContent='RESEARCHING';
   $('sourceStatus').textContent='Searching real photos + videos for "'+q+'"…';
   results.length=0; selected.length=0; sequence=[]; render();
+  const browserResearchFallback=async(term)=>{
+    const collected=[];
+    try{
+      const ov=new URL('https://api.openverse.org/v1/images/');
+      ov.searchParams.set('q',term);ov.searchParams.set('page_size','40');
+      const r=await fetch(ov,{headers:{'Accept':'application/json'}});
+      if(r.ok){const d=await r.json();for(const x of(d.results||[]))if(x?.url)collected.push({id:'ovb-'+x.id,title:x.title||'Untitled',source:'Openverse',kind:'image',url:x.url,thumb:x.thumbnail||x.url})}
+    }catch(_){}
+    for(const kind of ['bitmap','video']){
+      try{
+        const api=new URL('https://commons.wikimedia.org/w/api.php');
+        for(const [k,v] of [['action','query'],['format','json'],['formatversion','2'],['origin','*'],['generator','search'],['gsrsearch',term+' filetype:'+kind],['gsrnamespace','6'],['gsrlimit',kind==='video'?'25':'40'],['prop','imageinfo'],['iiprop','url|mime'],['iiurlwidth','1200']])api.searchParams.set(k,v);
+        const r=await fetch(api);if(!r.ok)continue;const d=await r.json();
+        for(const x of(d?.query?.pages||[])){const z=x?.imageinfo?.[0];if(!z?.url)continue;const mime=String(z.mime||'').toLowerCase();if(kind==='video'&&!mime.startsWith('video/'))continue;if(kind==='bitmap'&&!mime.startsWith('image/'))continue;collected.push({id:'wmb-'+x.pageid,title:(x.title||'').replace(/^File:/,''),source:'Wikimedia Commons',kind:kind==='video'?'video':'image',url:kind==='video'?z.url:(z.thumburl||z.url),thumb:z.thumburl||z.url})}
+      }catch(_){}
+    }
+    return collected;
+  };
+
   try{
     const r=await fetch('/media-search?q='+encodeURIComponent(q),{cache:'no-store'});
     const d=await r.json().catch(()=>null);
@@ -440,6 +459,10 @@ async function search(q){
       out.push(x);
     };
     (d?.results||[]).forEach(add);
+    if(out.length<8){
+      $('sourceStatus').textContent='Server returned few results — loading browser backup…';
+      (await browserResearchFallback(q)).forEach(add);
+    }
     results.push(...out.filter(x=>x.kind==='image').slice(0,120),...out.filter(x=>x.kind==='video').slice(0,60));
     const pc=results.filter(x=>x.kind==='image').length, vc=results.filter(x=>x.kind==='video').length;
     if(!pc&&!vc){
