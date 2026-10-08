@@ -173,6 +173,51 @@ const server=createServer(async(req,res)=>{
         return {items,more:!!d?.continue?.gsroffset};
       }catch(e){return {items:[],more:false,error:'Wikimedia '+fileType+': '+String(e?.message||e)}}
     };
+    const searchCommonsFallback=async(term,fileType)=>{
+      try{
+        const api=new URL('https://commons.wikimedia.org/w/api.php');
+        const p={
+          action:'query',format:'json',formatversion:'2',origin:'*',
+          list:'search',srsearch:term,srnamespace:'6',srlimit:fileType==='video'?'30':'50',
+          srwhat:'text',srinfo:'totalhits'
+        };
+        Object.entries(p).forEach(([k,v])=>api.searchParams.set(k,v));
+        const d=await fetchJson(api.toString(),12000);
+        const titles=(d?.query?.search||[]).map(x=>x.title).filter(Boolean);
+        if(!titles.length)return {items:[],more:false};
+        const meta=new URL('https://commons.wikimedia.org/w/api.php');
+        for(const [k,v] of [
+          ['action','query'],['format','json'],['formatversion','2'],['origin','*'],
+          ['titles',titles.join('|')],['prop','imageinfo'],
+          ['iiprop','url|size|mime|mediatype|extmetadata'],
+          ['iiextmetadatafilter','LicenseShortName|Artist|LicenseUrl'],['iiurlwidth','1400']
+        ])meta.searchParams.set(k,v);
+        const md=await fetchJson(meta.toString(),12000);
+        const items=[];
+        for(const x of md?.query?.pages||[]){
+          const z=x?.imageinfo?.[0],mime=String(z?.mime||'').toLowerCase();
+          const kind=mime.startsWith('video/')?'video':mime.startsWith('image/')?'image':'';
+          const title=String(x.title||'Untitled').replace(/^File:/,'');
+          if(!x.pageid||!z?.url||kind!==(fileType==='video'?'video':'image')||mime.includes('svg')||z.mediatype==='AUDIO'||z.mediatype==='TEXT'||rejectTitle(title))continue;
+          if(kind==='image'&&z.width&&z.width<640)continue;
+          if(kind==='video'&&z.size&&z.size>90000000)continue;
+          const clean=v=>String(v?.value||'').replace(/<[^>]+>/g,'').trim();
+          items.push({
+            id:'wm-fallback-'+x.pageid,title,source:'Wikimedia Commons',kind,
+            url:z.url,originalUrl:z.url,thumb:z.thumburl||z.url,
+            playUrl:kind==='image'?(z.thumburl||z.url):z.url,
+            width:Number(z.width||0),height:Number(z.height||0),mime,
+            license:clean(z.extmetadata?.LicenseShortName),
+            licenseUrl:clean(z.extmetadata?.LicenseUrl),
+            author:clean(z.extmetadata?.Artist),
+            pageUrl:z.descriptionurl||'https://commons.wikimedia.org/wiki/Special:Redirect/file/'+encodeURIComponent(title)
+          });
+        }
+        return {items,more:false};
+      }catch(e){
+        return {items:[],more:false,error:'Wikimedia fallback '+fileType+': '+String(e?.message||e)};
+      }
+    };
     const searchOpenverse=async(term)=>{
       const api=new URL('https://api.openverse.org/v1/images/');
       api.searchParams.set('q',term);api.searchParams.set('page_size','30');
@@ -185,14 +230,37 @@ const server=createServer(async(req,res)=>{
         return {items};
       }catch(e){return {items:[],error:'Openverse photos: '+String(e?.message||e)}}
     };
-    const [photos,videos]=await Promise.all(researchVariants.slice(0,1).map(t=>Promise.all([searchCommons(t,'bitmap'),searchCommons(t,'video')]))).then(x=>x[0]);
-    if(photos.error)errors.push(photos.error);if(videos.error)errors.push(videos.error);
+    const primaryTerm=researchVariants[0]||query;
+    let photos=await searchCommons(primaryTerm,'bitmap');
+    let videos=await searchCommons(primaryTerm,'video');
+    if(photos.error)errors.push(photos.error);
+    if(videos.error)errors.push(videos.error);
+    // Robust Wikimedia fallback: normal file search, still restricted to Wikimedia Commons.
+    if(offset===0&&photos.items.length<8){
+      const fb=await searchCommonsFallback(primaryTerm,'bitmap');
+      if(fb.error)errors.push(fb.error);
+      photos={items:[...photos.items,...fb.items],more:photos.more||fb.more};
+    }
+    if(offset===0&&videos.items.length<4){
+      const fb=await searchCommonsFallback(primaryTerm,'video');
+      if(fb.error)errors.push(fb.error);
+      videos={items:[...videos.items,...fb.items],more:videos.more||fb.more};
+    }
     let images=photos.items;
     if(offset===0&&images.length<8&&researchVariants[1]){
-      const extraResult=await searchCommons(researchVariants[1],'bitmap');if(extraResult.error)errors.push(extraResult.error);images=images.concat(extraResult.items);
+      const extraResult=await searchCommons(researchVariants[1],'bitmap');
+      if(extraResult.error)errors.push(extraResult.error);
+      images=images.concat(extraResult.items);
+      if(images.length<8){
+        const fb=await searchCommonsFallback(researchVariants[1],'bitmap');
+        if(fb.error)errors.push(fb.error);
+        images=images.concat(fb.items);
+      }
     }
     if(offset===0&&images.length<4){
-      const ov=await searchOpenverse(researchVariants[0]||query);if(ov.error)errors.push(ov.error);images=images.concat(ov.items);
+      const ov=await searchOpenverse(primaryTerm);
+      if(ov.error)errors.push(ov.error);
+      images=images.concat(ov.items);
     }
     const seen=new Set(),resultsOut=[];
     const add=x=>{const key=x.kind+'|'+String(x.originalUrl||x.url).split('?')[0]+'|'+String(x.title).toLowerCase();if(!seen.has(x.id)&&!seen.has(key)){seen.add(x.id);seen.add(key);resultsOut.push(x)}};
