@@ -409,4 +409,9 @@ const shutdown=signal=>{
 };
 process.on('SIGTERM',()=>shutdown('SIGTERM'));
 process.on('SIGINT',()=>shutdown('SIGINT'));
+// Keep the connection layer tolerant of Render/Cloudflare request latency.
+server.keepAliveTimeout=120000;
+server.headersTimeout=125000;
+server.requestTimeout=300000;
+server.timeout=0;
 server.listen({port,host:'0.0.0.0'},()=>console.log('Festival of Bharat Reel Maker listening on 0.0.0.0:'+port));
