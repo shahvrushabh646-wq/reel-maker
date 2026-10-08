@@ -5,7 +5,6 @@ import { readFileSync, existsSync } from 'node:fs';
 import { writeFile, unlink } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { spawn } from 'node:child_process';
-import ffmpegPath from 'ffmpeg-static';
 
 if (existsSync(resolve('.env'))) {
   for (const line of readFileSync(resolve('.env'),'utf8').split(/\r?\n/)) {
@@ -89,7 +88,7 @@ const server=createServer(async(req,res)=>{
     try{
       await writeFile(input,Buffer.concat(chunks));
       await new Promise((resolveDone,reject)=>{
-        const p=spawn(ffmpegPath,[
+        const p=spawn(process.env.FFMPEG_PATH || 'ffmpeg',[
           '-hide_banner','-loglevel','error','-y','-i',input,
           '-map','0:v:0','-map','0:a:0?',
           '-c:v','libx264','-preset','veryfast','-profile:v','high',
