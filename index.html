@@ -529,7 +529,20 @@ async function renderTemplateMedia(ctx,media,scene,local,idx,slot,captureFrame){
  const rect=async(asset,x,y,w,h,z=1,ox=0,oy=0,rot=0)=>{
    if(!asset)return;
    const m=asset.kind==='video'?await loadVideo(asset):await loadImage(asset.playUrl||asset.url||asset.thumbPlay);
-   ctx.save();ctx.beginPath();ctx.rect(x,y,w,h);ctx.clip();ctx.translate(x,y);fit(ctx,m,w,h,z,ox,oy,rot);ctx.restore();
+   const motion=String(activeTemplate?.motion||'drift');
+   const u=Math.max(0,Math.min(1,local));
+   let mz=z,mx=ox,my=oy,mr=rot;
+   const ease=t=>t*t*(3-2*t);
+   if(motion==='slow-push') mz*=1+0.09*u;
+   else if(motion==='slow-pull') mz*=1.12-0.09*u;
+   else if(motion==='pan-left') mx+=42-84*u;
+   else if(motion==='pan-right') mx+=-42+84*u;
+   else if(motion==='pan-up') my+=38-76*u;
+   else if(motion==='reveal'){mz*=1.16-0.12*u;my+=26-52*u}
+   else if(motion==='diagonal'){mz*=1.04+0.08*u;mx+=-30+60*u;my+=24-48*u;mr+=(u-.5)*0.012}
+   else if(motion==='crop-punch'){const e=ease(u<.5?u*2:(1-u)*2);mz*=1.02+0.13*e}
+   else if(motion==='drift'){mx+=Math.sin(u*Math.PI*2)*20;my+=Math.cos(u*Math.PI*2)*12;mr+=(u-.5)*0.006}
+   ctx.save();ctx.beginPath();ctx.rect(x,y,w,h);ctx.clip();ctx.translate(x,y);fit(ctx,m,w,h,mz,mx,my,mr);ctx.restore();
  };
  const card=(x,y,w,h,fill='rgba(255,255,255,.92)',r=0)=>{
    ctx.save();ctx.fillStyle=fill;
