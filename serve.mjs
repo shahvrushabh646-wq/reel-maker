@@ -111,7 +111,7 @@ const server=createServer(async(req,res)=>{
     const raw=(u.searchParams.get('q')||'').trim();
     const offset=Math.max(0,Number(u.searchParams.get('offset')||0)||0);
     if(!raw) return send(res,400,{'Content-Type':'application/json'},JSON.stringify({error:'Missing query'}));
-    const query=raw.replace(/\\s+/g,' ').slice(0,180);
+    const query=raw.replace(/\s+/g,' ').trim().slice(0,180);
     const cacheKey=query.toLowerCase()+'|'+offset;
     serverMediaCache=serverMediaCache||new Map();
     const cached=serverMediaCache.get(cacheKey);
@@ -136,7 +136,7 @@ const server=createServer(async(req,res)=>{
       if(!variants.some(v=>v.toLowerCase()===item.toLowerCase())) variants.push(item);
     }
     const researchVariants=variants.slice(0,3);
-    const rejectTitle=t=>/(icon|logo|pictogram|coat of arms|locator map|flag of|diagram|watermark|symbol|svg\\b|banner\\b)/i.test(String(t||''));
+    const rejectTitle=t=>/(icon|logo|pictogram|coat of arms|locator map|flag of|diagram|watermark|symbol|svg\b|banner\b)/i.test(String(t||''));
     const fetchJson=async(url,ms=12000)=>{
       let last='request failed',wait=350;
       for(let attempt=0;attempt<3;attempt++){
@@ -164,11 +164,11 @@ const server=createServer(async(req,res)=>{
           const z=x?.imageinfo?.[0],mime=String(z?.mime||'').toLowerCase();
           const kind=mime.startsWith('video/')?'video':mime.startsWith('image/')?'image':'';
           const title=String(x.title||'Untitled').replace(/^File:/,'');
-          if(!x.pageid||!z?.url||kind!==(fileType==='video'?'video':'image')||mime.includes('svg')||rejectTitle(title))continue;
+          if(!x.pageid||!z?.url||kind!==(fileType==='video'?'video':'image')||mime.includes('svg')||z.mediatype==='AUDIO'||z.mediatype==='TEXT'||rejectTitle(title))continue;
           if(kind==='image'&&z.width&&z.width<640)continue;
           if(kind==='video'&&z.size&&z.size>90000000)continue;
           const clean=v=>String(v?.value||'').replace(/<[^>]+>/g,'').trim();
-          items.push({id:'wm'+x.pageid,title,source:'Wikimedia Commons',kind,url:kind==='image'&&z.thumburl?z.thumburl:z.url,originalUrl:z.url,thumb:z.thumburl||z.url,width:Number(z.width||0),height:Number(z.height||0),mime,license:clean(z.extmetadata?.LicenseShortName),licenseUrl:clean(z.extmetadata?.LicenseUrl),author:clean(z.extmetadata?.Artist),pageUrl:z.descriptionurl||'https://commons.wikimedia.org/wiki/Special:Redirect/file/'+encodeURIComponent(title)});
+          items.push({id:'wm-'+x.pageid,title,source:'Wikimedia Commons',kind,url:z.url,originalUrl:z.url,thumb:z.thumburl||z.url,playUrl:kind==='image'?(z.thumburl||z.url):z.url,width:Number(z.width||0),height:Number(z.height||0),mime,license:clean(z.extmetadata?.LicenseShortName),licenseUrl:clean(z.extmetadata?.LicenseUrl),author:clean(z.extmetadata?.Artist),pageUrl:z.descriptionurl||'https://commons.wikimedia.org/wiki/Special:Redirect/file/'+encodeURIComponent(title)});
         }
         return {items,more:!!d?.continue?.gsroffset};
       }catch(e){return {items:[],more:false,error:'Wikimedia '+fileType+': '+String(e?.message||e)}}
