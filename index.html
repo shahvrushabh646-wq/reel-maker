@@ -420,24 +420,42 @@ async function search(q){
   q=String(q||'').trim();
   if(!q)return;
   $('statusTop').textContent='RESEARCHING';
-  $('sourceStatus').textContent='Searching real photos + videos…';
-  results.length=0; selected.length=0; render();
+  $('sourceStatus').textContent='Searching real photos + videos for "'+q+'"…';
+  results.length=0; selected.length=0; sequence=[]; render();
   try{
     const r=await fetch('/media-search?q='+encodeURIComponent(q),{cache:'no-store'});
     const d=await r.json().catch(()=>null);
-    if(!r.ok) throw new Error(d?.error||'Media search failed');
+    if(!r.ok){
+      const detail=(d?.details&&d.details.length)?(' · '+d.details.slice(0,2).join(' · ')):'';
+      throw new Error((d?.error||'Media search failed')+detail);
+    }
     const out=[],seen=new Set();
-    const add=x=>{if(x?.url&&!seen.has(x.url)){seen.add(x.url);x.playUrl=proxy(x.url);x.thumbPlay=x.thumb?proxy(x.thumb):x.playUrl;out.push(x)}};
+    const add=x=>{
+      if(!x?.url)return;
+      const key=String(x.url).split('?')[0];
+      if(seen.has(key))return;
+      seen.add(key);
+      x.playUrl=proxy(x.url);
+      x.thumbPlay=x.thumb?proxy(x.thumb):x.playUrl;
+      out.push(x);
+    };
     (d?.results||[]).forEach(add);
-    results.push(...out.filter(x=>x.kind==='image').slice(0,120),...out.filter(x=>x.kind==='video').slice(0,40));
+    results.push(...out.filter(x=>x.kind==='image').slice(0,120),...out.filter(x=>x.kind==='video').slice(0,60));
     const pc=results.filter(x=>x.kind==='image').length, vc=results.filter(x=>x.kind==='video').length;
-    $('sourceStatus').textContent='Loaded '+pc+' photos + '+vc+' videos';
+    if(!pc&&!vc){
+      $('statusTop').textContent='NO RESULTS';
+      $('sourceStatus').textContent='No media found for "'+q+'". Try a broader topic (festival, temple, city).';
+      mediaTab='all'; render(); return;
+    }
+    mediaTab='all';
+    const src=d?.source||'open sources';
+    $('sourceStatus').textContent='Loaded '+pc+' photos + '+vc+' videos from '+src+' · Select media manually';
     $('statusTop').textContent='READY';
-    sequence=[]; render(); renderToken++; draw(0);
+    sequence=[]; render(); renderToken++; draw(0).catch(()=>{});
   }catch(e){
     $('statusTop').textContent='ERROR';
     $('sourceStatus').textContent='Media search failed: '+String(e.message||e);
-    render();
+    mediaTab='all'; render();
   }
 }
 $('form').onsubmit=e=>{e.preventDefault();search($('q').value.trim())};
