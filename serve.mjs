@@ -128,8 +128,14 @@ const server=createServer(async(req,res)=>{
       [/pongal|onam|baisakhi|lohri|bihu/i,['India harvest festival']]
     ];
     const extra=(hints.find(x=>x[0].test(query))||[])[1]||[];
-    const variants=[query,...extra.filter(x=>x.toLowerCase()!==query.toLowerCase())].slice(0,3);
-    if(!/india|festival|temple/i.test(query)&&variants.length<3)variants.push(query+' festival India');
+    // Match the supplied ZIP's research variant order exactly:
+    // original query -> generic India/festival/temple expansion -> topic-specific hints.
+    const variants=[query];
+    if(!/india|festival|temple/i.test(query))variants.push(query+' festival India');
+    for(const item of extra){
+      if(!variants.some(v=>v.toLowerCase()===item.toLowerCase())) variants.push(item);
+    }
+    const researchVariants=variants.slice(0,3);
     const rejectTitle=t=>/(icon|logo|pictogram|coat of arms|locator map|flag of|diagram|watermark|symbol|svg\\b|banner\\b)/i.test(String(t||''));
     const fetchJson=async(url,ms=12000)=>{
       let last='request failed',wait=350;
@@ -179,14 +185,14 @@ const server=createServer(async(req,res)=>{
         return {items};
       }catch(e){return {items:[],error:'Openverse photos: '+String(e?.message||e)}}
     };
-    const [photos,videos]=await Promise.all(variants.slice(0,1).map(t=>Promise.all([searchCommons(t,'bitmap'),searchCommons(t,'video')]))).then(x=>x[0]);
+    const [photos,videos]=await Promise.all(researchVariants.slice(0,1).map(t=>Promise.all([searchCommons(t,'bitmap'),searchCommons(t,'video')]))).then(x=>x[0]);
     if(photos.error)errors.push(photos.error);if(videos.error)errors.push(videos.error);
     let images=photos.items;
-    if(offset===0&&images.length<8&&variants[1]){
-      const extraResult=await searchCommons(variants[1],'bitmap');if(extraResult.error)errors.push(extraResult.error);images=images.concat(extraResult.items);
+    if(offset===0&&images.length<8&&researchVariants[1]){
+      const extraResult=await searchCommons(researchVariants[1],'bitmap');if(extraResult.error)errors.push(extraResult.error);images=images.concat(extraResult.items);
     }
     if(offset===0&&images.length<4){
-      const ov=await searchOpenverse(query);if(ov.error)errors.push(ov.error);images=images.concat(ov.items);
+      const ov=await searchOpenverse(researchVariants[0]||query);if(ov.error)errors.push(ov.error);images=images.concat(ov.items);
     }
     const seen=new Set(),resultsOut=[];
     const add=x=>{const key=x.kind+'|'+String(x.originalUrl||x.url).split('?')[0]+'|'+String(x.title).toLowerCase();if(!seen.has(x.id)&&!seen.has(key)){seen.add(x.id);seen.add(key);resultsOut.push(x)}};
