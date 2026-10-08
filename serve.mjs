@@ -40,6 +40,13 @@ const server=createServer(async(req,res)=>{
       let r;
       try{r=await fetch(t,{redirect:'follow',headers,signal:controller.signal})}finally{clearTimeout(timer)}
       if(!r.ok) return send(res,r.status,{'Content-Type':'text/plain'},'Upstream '+r.status);
+      // Validate the final URL too, because redirects can otherwise bypass the initial host check.
+      try{
+        const finalUrl=new URL(r.url||t.toString());
+        const finalHost=finalUrl.hostname.toLowerCase().replace(/^\[|\]$/g,'');
+        const finalPrivate=finalHost==='localhost'||finalHost==='0.0.0.0'||finalHost==='::1'||finalHost.endsWith('.local')||/^127\./.test(finalHost)||/^10\./.test(finalHost)||/^192\.168\./.test(finalHost)||/^169\.254\./.test(finalHost)||/^172\.(1[6-9]|2\d|3[0-1])\./.test(finalHost);
+        if(!['http:','https:'].includes(finalUrl.protocol)||finalPrivate) return send(res,400,{'Content-Type':'text/plain'},'Unsupported redirect target');
+      }catch{return send(res,400,{'Content-Type':'text/plain'},'Invalid redirect target')}
       const h={
         'Access-Control-Allow-Origin':'*',
         'Access-Control-Expose-Headers':'Accept-Ranges, Content-Length, Content-Range, Content-Type',
@@ -143,22 +150,22 @@ const server=createServer(async(req,res)=>{
     const rejectTitle=title=>/(icon|logo|pictogram|coat of arms|locator map|flag of|diagram|watermark|symbol|svg\b|banner\b)/i.test(title);
     const stripHtml=value=>String(value||'').replace(/<[^>]+>/g,' ').replace(/&amp;/g,'&').replace(/&quot;/g,'\"').replace(/&#039;|'/g,"'").replace(/&lt;/g,'<').replace(/&gt;/g,'>').replace(/\s+/g,' ').trim().slice(0,180);
 
-    const fetchJson=async(url,ms=7000)=>{
-      const started=Date.now(); let last='request failed'; let wait=350;
-      for(let attempt=0;attempt<2;attempt++){
+    const fetchJson=async(url,ms=10000)=>{
+      let last='request failed';
+      for(let attempt=0;attempt<3;attempt++){
         try{
-          const response=await fetch(url,{headers:{'User-Agent':UA,'Accept':'application/json'},signal:AbortSignal.timeout(ms)});
+          const response=await fetch(url,{headers:{'User-Agent':UA,'Accept':'application/json'},signal:AbortSignal.timeout(ms),redirect:'follow'});
           const text=await response.text();
           if(response.status===429||response.status>=500){
             last='HTTP '+response.status;
-            await new Promise(resolve=>setTimeout(resolve,wait)); wait*=2; continue;
+            if(attempt<2) await new Promise(resolve=>setTimeout(resolve,400*(attempt+1)));
+            continue;
           }
           if(!response.ok) throw new Error('HTTP '+response.status);
           try{return JSON.parse(text)}catch{throw new Error('response was not JSON')}
         }catch(error){
           last=error instanceof Error?error.message:'request failed';
-          if(attempt===2) break;
-          await new Promise(resolve=>setTimeout(resolve,wait)); wait*=2;
+          if(attempt<2) await new Promise(resolve=>setTimeout(resolve,400*(attempt+1)));
         }
       }
       throw new Error(last);
