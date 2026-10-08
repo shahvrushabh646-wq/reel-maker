@@ -313,12 +313,20 @@ const server=createServer(async(req,res)=>{
         errors.push('Wikimedia videos fallback: '+String(e2.message||e2)); return [];
       }
     });
-    const [wmPhotos,wmVideos,ovPhotos,ovVideos,gPhotos]=await Promise.all([
+    let [wmPhotos,wmVideos,ovPhotos,ovVideos,gPhotos]=await Promise.all([
       wmPhotoPromise,wmVideoPromise,
       searchOpenverseImages(q,80).catch(e=>{errors.push('Openverse photos: '+String(e.message||e));return[];}),
       searchOpenverseVideos(q,40).catch(e=>{errors.push('Openverse videos: '+String(e.message||e));return[];}),
       searchGoogleImages(q,20).catch(e=>{errors.push('Google images: '+String(e.message||e));return[];})
     ]);
+    if(!wmPhotos.length){
+      try{ wmPhotos=await searchWikimediaFallback(q,'image',80); }
+      catch(e){ errors.push('Wikimedia photos fallback: '+String(e.message||e)); }
+    }
+    if(!wmVideos.length){
+      try{ wmVideos=await searchWikimediaFallback(q,'video',60); }
+      catch(e){ errors.push('Wikimedia videos fallback: '+String(e.message||e)); }
+    }
 
     for(const list of [wmPhotos,ovPhotos,gPhotos,wmVideos,ovVideos]) for(const x of list) add(x);
 
