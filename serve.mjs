@@ -152,43 +152,63 @@ const server=createServer(async(req,res)=>{
     };
 
     const searchWikimedia=async(searchTerm,targetKind,maxItems=100)=>{
-      const collected=[]; const seenPages=new Set(); let continuation=null;
-      for(let page=0; page<4 && collected.length<maxItems; page++){
-        const api=new URL('https://commons.wikimedia.org/w/api.php');
-        for(const [k,v] of [
-          ['action','query'],['format','json'],['formatversion','2'],['generator','search'],
-          ['gsrsearch',searchTerm],['gsrnamespace','6'],['gsrlimit','100'],['gsrwhat','text'],
-          ['prop','imageinfo'],['iiprop','url|mime|size|thumbmime'],['iiurlwidth','1000'],['origin','*']
-        ]) api.searchParams.set(k,v);
-        if(continuation) api.searchParams.set('gsrcontinue',continuation);
-        const d=await withRetry(()=>fetchJson(api,{
-          headers:{
-            'User-Agent':'Festival-of-Bharat-Reel-Maker/1.4',
-            'Accept':'application/json'
+      const collected=[]; const seen=new Set(); let offset=0;
+      const terms=targetKind==='video' ? [searchTerm, searchTerm+' video'] : [searchTerm];
+      for(const term of terms){
+        if(collected.length>=maxItems) break;
+        for(let page=0; page<3 && collected.length<maxItems; page++){
+          const api=new URL('https://commons.wikimedia.org/w/api.php');
+          for(const [k,v] of [
+            ['action','query'],['format','json'],['formatversion','2'],['list','search'],
+            ['srsearch',term],['srnamespace','6'],['srlimit','50'],['srwhat','text'],
+            ['srprop','size|timestamp'],['sroffset',String(offset)],['origin','*']
+          ]) api.searchParams.set(k,v);
+          const d=await withRetry(()=>fetchJson(api,{
+            headers:{
+              'User-Agent':'Festival-of-Bharat-Reel-Maker/1.5',
+              'Api-User-Agent':'Festival-of-Bharat-Reel-Maker/1.5',
+              'Accept':'application/json'
+            }
+          },10000));
+          const hits=d?.query?.search||[];
+          if(!hits.length) break;
+          const titles=hits.map(x=>x?.title).filter(Boolean);
+          for(let i=0;i<titles.length && collected.length<maxItems;i+=25){
+            const batch=titles.slice(i,i+25).join('|');
+            const info=new URL('https://commons.wikimedia.org/w/api.php');
+            for(const [k,v] of [
+              ['action','query'],['format','json'],['formatversion','2'],['prop','imageinfo'],
+              ['titles',batch],['iiprop','url|mime|size|thumbmime'],['iiurlwidth','1000'],['origin','*']
+            ]) info.searchParams.set(k,v);
+            const d2=await withRetry(()=>fetchJson(info,{
+              headers:{
+                'User-Agent':'Festival-of-Bharat-Reel-Maker/1.5',
+                'Api-User-Agent':'Festival-of-Bharat-Reel-Maker/1.5',
+                'Accept':'application/json'
+              }
+            },10000));
+            for(const x of (d2?.query?.pages||[])){
+              const z=x?.imageinfo?.[0], mime=String(z?.mime||'').toLowerCase();
+              const kind=mime.startsWith('image/')?'image':mime.startsWith('video/')?'video':'';
+              if(kind!==targetKind || !z?.url || seen.has(String(x.pageid))) continue;
+              seen.add(String(x.pageid));
+              collected.push({
+                id:(kind==='video'?'wmv':'wm')+x.pageid,
+                title:(x.title||'').replace(/^File:/,''),
+                source:'Wikimedia Commons',
+                url:(kind==='image'&&z.thumburl)?z.thumburl:z.url,
+                originalUrl:z.url,thumb:z.thumburl||z.url||'',kind
+              });
+            }
           }
-        },10000));
-        for(const x of (d?.query?.pages||[])){
-          const z=x?.imageinfo?.[0];
-          const mime=String(z?.mime||'').toLowerCase();
-          const kind=mime.startsWith('image/')?'image':mime.startsWith('video/')?'video':'';
-          if(kind!==targetKind || !z?.url || seenPages.has(String(x.pageid))) continue;
-          seenPages.add(String(x.pageid));
-          collected.push({
-            id:(kind==='video'?'wmv':'wm')+x.pageid,
-            title:(x.title||'').replace(/^File:/,'') || ('Wikimedia Commons '+kind),
-            source:'Wikimedia Commons',
-            url:(kind==='image' && z.thumburl)?z.thumburl:z.url,
-            originalUrl:z.url,
-            thumb:z.thumburl||z.url||'',
-            kind
-          });
-          if(collected.length>=maxItems) break;
+          offset+=hits.length;
+          if(!d?.continue?.sroffset) break;
         }
-        continuation=d?.continue?.gsrcontinue||null;
-        if(!continuation) break;
+        offset=0;
       }
       return collected;
     };
+
 
     const searchWikimediaFallback=async(searchTerm,targetKind,maxItems=60)=>{
       const collected=[]; const seen=new Set();
