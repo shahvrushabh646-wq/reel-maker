@@ -143,9 +143,9 @@ const server=createServer(async(req,res)=>{
     const rejectTitle=title=>/(icon|logo|pictogram|coat of arms|locator map|flag of|diagram|watermark|symbol|svg\b|banner\b)/i.test(title);
     const stripHtml=value=>String(value||'').replace(/<[^>]+>/g,' ').replace(/&amp;/g,'&').replace(/&quot;/g,'\"').replace(/&#039;|'/g,"'").replace(/&lt;/g,'<').replace(/&gt;/g,'>').replace(/\s+/g,' ').trim().slice(0,180);
 
-    const fetchJson=async(url,ms=12000)=>{
+    const fetchJson=async(url,ms=7000)=>{
       const started=Date.now(); let last='request failed'; let wait=350;
-      for(let attempt=0;attempt<3;attempt++){
+      for(let attempt=0;attempt<2;attempt++){
         try{
           const response=await fetch(url,{headers:{'User-Agent':UA,'Accept':'application/json'},signal:AbortSignal.timeout(ms)});
           const text=await response.text();
