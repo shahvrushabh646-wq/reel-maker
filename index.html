@@ -289,7 +289,7 @@ window.previewTemplate=previewTemplate;
 function renderTemplates(){
  const tabs=$('templateTabs'),list=$('templateList');if(!tabs||!list)return;
  const cats=['All','Slow','Mixed','Fast'];
- tabs.innerHTML=cats.map(x=>'<button type="button" class="tab '+(templateCat===x?'active':'')+'" onclick="setCat(\\''+x+'\\')">'+x+' <span style="opacity:.65">('+(x==='All'?templates.length:templates.filter(t=>t.cat===x).length)+')</span></button>').join('');
+ tabs.innerHTML=cats.map(x=>'<button type="button" class="tab '+(templateCat===x?'active':'')+'" onclick="setCat(\''+x+'\')">'+x+' <span style="opacity:.65">('+(x==='All'?templates.length:templates.filter(t=>t.cat===x).length)+')</span></button>').join('');
  const query=String($('templateSearch')?.value||'').trim().toLowerCase();
  const filtered=templates.map((t,i)=>({t,i})).filter(({t})=>{
    const catOk=templateCat==='All'||t.cat===templateCat;
