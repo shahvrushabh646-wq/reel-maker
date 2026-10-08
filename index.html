@@ -560,9 +560,10 @@ async function validateSequenceMedia(){
  }
  return true;
 }
+let exportTimelineDuration=null;
 function sceneAt(t){
  if(!sequence.length)sequence=buildSequence();
- const dur=+$('duration').value, n=sequence.length, raw=((t%dur)+dur)%dur, slot=dur/n, idx=Math.min(n-1,Math.floor(raw/slot)), local=(raw-idx*slot)/slot;
+ const dur=exportTimelineDuration||Math.max(1,+$('duration').value||15), n=sequence.length, raw=((t%dur)+dur)%dur, slot=dur/n, idx=Math.min(n-1,Math.floor(raw/slot)), local=(raw-idx*slot)/slot;
  return {scene:sequence[idx],idx,local,slot};
 }
 async function draw(t,captureFrame=false){
@@ -933,7 +934,7 @@ $('export').onclick=async()=>{
    }
  }
  const exportEnd=duration;
- const originalDurationValue=$('duration').value;
+ exportTimelineDuration=duration;
  playing=true;
  while(playing){
    const elapsed=(performance.now()-startedAt)/1000;
@@ -947,6 +948,7 @@ $('export').onclick=async()=>{
  await draw(Math.max(0,exportEnd-.001),true);
  if(exportAudio){try{exportAudio.pause()}catch{}}
  rec.stop();
+ exportTimelineDuration=null;
 };
 update();draw(0);
 </script><script>
