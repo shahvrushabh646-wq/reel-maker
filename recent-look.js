@@ -27,40 +27,38 @@ function applyRecentZipLook(ctx, template){
   const ink=recentZipInk(template);
   const W=ctx.canvas.width,H=ctx.canvas.height;
   const variant=Number(template?.variant||0);
-  const mode=((variant%6)+6)%6;
   ctx.save();
 
-  // The supplied no-text look.ts uses the palette to tint decorative elements.
-  // Here we preserve the existing renderer and add the same visual language as a final pass.
+  // Restrained finishing grade: subtle palette tint, cinematic vignette,
+  // and a consistent safe-area frame instead of loud decorative bars.
   ctx.globalCompositeOperation='soft-light';
   ctx.fillStyle=ink.accent;
-  ctx.globalAlpha=0.055;
+  ctx.globalAlpha=.035;
   ctx.fillRect(0,0,W,H);
   ctx.globalCompositeOperation='source-over';
   ctx.globalAlpha=1;
 
-  if(mode===0){
-    ctx.fillStyle=ink.accent;ctx.fillRect(0,0,W,12);
-  }else if(mode===1){
-    ctx.fillStyle=ink.accent;ctx.fillRect(0,H-14,W,14);
-  }else if(mode===2){
-    ctx.fillStyle=ink.accent;ctx.fillRect(0,0,16,H);
-  }else if(mode===3){
-    ctx.fillStyle=ink.bg;ctx.fillRect(0,0,W,86);ctx.fillRect(0,H-86,W,86);
-  }else if(mode===4){
-    const g=ctx.createRadialGradient(W/2,H/2,Math.min(W,H)*.18,W/2,H/2,Math.max(W,H)*.7);
-    g.addColorStop(0,'rgba(0,0,0,0)');
-    g.addColorStop(1,'rgba(0,0,0,.42)');
-    ctx.fillStyle=g;ctx.fillRect(0,0,W,H);
-  }else{
-    ctx.strokeStyle=ink.accent;ctx.lineWidth=3;ctx.strokeRect(28,28,W-56,H-56);
-  }
+  const vignette=ctx.createRadialGradient(W/2,H*.43,Math.min(W,H)*.16,W/2,H*.48,Math.max(W,H)*.76);
+  vignette.addColorStop(0,'rgba(0,0,0,0)');
+  vignette.addColorStop(.68,'rgba(0,0,0,.08)');
+  vignette.addColorStop(1,'rgba(0,0,0,.46)');
+  ctx.fillStyle=vignette;
+  ctx.fillRect(0,0,W,H);
 
-  // The no-text source also switches charcoal variants to monochrome.
+  // Slim accent rule and inset frame create a deliberate editorial finish.
+  ctx.globalAlpha=.9;
+  ctx.fillStyle=ink.accent;
+  ctx.fillRect(Math.round(W*.065),Math.round(H*.055),Math.round(W*.16),Math.max(3,Math.round(W*.004)));
+  ctx.globalAlpha=.5;
+  ctx.strokeStyle=ink.fg;
+  ctx.lineWidth=Math.max(1,Math.round(W*.0015));
+  ctx.strokeRect(Math.round(W*.045),Math.round(H*.035),Math.round(W*.91),Math.round(H*.93));
+
+  // Monochrome stays intentional and restrained for charcoal looks.
   if(template?.palette==='charcoal' && variant%2===0){
     ctx.globalCompositeOperation='saturation';
     ctx.fillStyle='#000';
-    ctx.globalAlpha=.78;
+    ctx.globalAlpha=.72;
     ctx.fillRect(0,0,W,H);
   }
   ctx.restore();
